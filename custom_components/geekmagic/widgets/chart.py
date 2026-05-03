@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Any, ClassVar
 
 from ..const import COLOR_CYAN  # Used as component dataclass default
 from .base import Widget, WidgetConfig
-from .components import THEME_TEXT_SECONDARY, Color, Component, Row, Spacer, Text
+from .components import THEME_TEXT_SECONDARY, Color, Column, Component, Row, Spacer, Text
 
 if TYPE_CHECKING:
     from ..render_context import RenderContext
@@ -36,63 +36,132 @@ class ChartDisplay(Component):
         font_label = ctx.get_font("small")
         padding = int(width * 0.08)
 
-        # Calculate chart area
-        header_height = int(height * 0.15) if self.label else int(height * 0.08)
-        is_binary = self._is_binary_data()
-        if self.show_range and not is_binary:
-            footer_height = int(height * 0.12)
+        # Three header modes:
+        # 1. inline: label + value on one row (preferred when both fit)
+        # 2. stacked: label above value (when they don't fit horizontally
+        #    but there's vertical room — keeps the label visible)
+        # 3. value-only: drop label entirely (when neither fits)
+        inner_w = width - padding * 2
+        value_str = f"{self.current_value:.1f}{self.unit}" if self.current_value is not None else ""
+        has_label = bool(self.label)
+        has_value = bool(value_str)
+        font_value = ctx.get_font("regular")
+        _, label_h = ctx.get_text_size("Hg", font_label) if has_label else (0, 0)
+        _, value_h = ctx.get_text_size("Hg", font_value) if has_value else (0, 0)
+
+        mode = "empty"
+        if has_label and has_value:
+            label_w, _ = ctx.get_text_size(self.label.upper(), font_label)
+            value_w, _ = ctx.get_text_size(value_str, font_value)
+            inline_fits = label_w + value_w + 4 <= inner_w
+            # Only stack when there's clearly room to spare above the chart —
+            # stacking inside a tight header crushes both lines into the
+            # chart area below.
+            stacked_h_needed = label_h + value_h + 4
+            stack_fits = stacked_h_needed <= int(height * 0.32) and height >= 90
+            if inline_fits:
+                mode = "inline"
+            elif stack_fits:
+                mode = "stacked"
+            else:
+                mode = "value_only"
+        elif has_value:
+            mode = "value_only"
+        elif has_label:
+            mode = "label_only"
+
+        if mode == "stacked":
+            header_height = label_h + value_h + 8
+        elif mode in ("inline", "value_only", "label_only"):
+            header_height = max(int(height * 0.18), max(label_h, value_h) + 4)
         else:
-            footer_height = int(height * 0.04)
+            header_height = int(height * 0.08)
+
+        is_binary = self._is_binary_data()
+        # Hide min/max range labels when the cell is too small to fit them
+        # without overlapping the sparkline.
+        show_range = self.show_range and not is_binary and height >= 80
+        footer_height = int(height * 0.12) if show_range else int(height * 0.04)
         chart_top = y + header_height
         chart_bottom = y + height - footer_height
         chart_rect = (x + padding, chart_top, x + width - padding, chart_bottom)
 
-        # Decide which header pieces fit. The value is more informative than
-        # the label at narrow sizes, so drop the label first when the two
-        # together would overflow the inner header width.
-        inner_w = width - padding * 2
-        value_str = f"{self.current_value:.1f}{self.unit}" if self.current_value is not None else ""
-
-        show_label = bool(self.label)
-        show_value = bool(value_str)
-        if show_label and show_value:
-            font_value = ctx.get_font("regular")
-            label_w, _ = ctx.get_text_size(self.label.upper(), font_label)
-            value_w, _ = ctx.get_text_size(value_str, font_value)
-            if label_w + value_w + 4 > inner_w:
-                show_label = False  # Value wins; label drops to make room.
-
-        header_children: list[Component] = []
-        if show_label:
-            header_children.append(
-                Text(
-                    text=self.label.upper(),
-                    font="small",
-                    color=THEME_TEXT_SECONDARY,
-                    align="start",
-                    truncate=True,
-                )
-            )
-        if show_value:
-            if show_label:
-                header_children.append(Spacer())
-            header_children.append(
-                Text(
-                    text=value_str,
-                    font="regular",
-                    color=self.color,
-                    align="end" if show_label else "center",
-                    auto_fit=True,
-                )
-            )
-
-        if header_children:
+        if mode == "stacked":
+            Column(
+                children=[
+                    Text(
+                        text=self.label.upper(),
+                        font="small",
+                        color=THEME_TEXT_SECONDARY,
+                        align="center",
+                        truncate=True,
+                    ),
+                    Text(
+                        text=value_str,
+                        font="regular",
+                        color=self.color,
+                        align="center",
+                        auto_fit=True,
+                    ),
+                ],
+                gap=2,
+                padding=2,
+                align="stretch",
+                justify="center",
+            ).render(ctx, x, y, width, header_height)
+        elif mode == "inline":
             Row(
-                children=header_children,
+                children=[
+                    Text(
+                        text=self.label.upper(),
+                        font="small",
+                        color=THEME_TEXT_SECONDARY,
+                        align="start",
+                        truncate=True,
+                    ),
+                    Spacer(),
+                    Text(
+                        text=value_str,
+                        font="regular",
+                        color=self.color,
+                        align="end",
+                        auto_fit=True,
+                    ),
+                ],
                 gap=4,
                 padding=padding,
                 align="center",
-                justify="center" if not show_label else "start",
+                justify="start",
+            ).render(ctx, x, y, width, header_height)
+        elif mode == "value_only":
+            Row(
+                children=[
+                    Text(
+                        text=value_str,
+                        font="regular",
+                        color=self.color,
+                        align="center",
+                        auto_fit=True,
+                    )
+                ],
+                padding=padding,
+                align="center",
+                justify="center",
+            ).render(ctx, x, y, width, header_height)
+        elif mode == "label_only":
+            Row(
+                children=[
+                    Text(
+                        text=self.label.upper(),
+                        font="small",
+                        color=THEME_TEXT_SECONDARY,
+                        align="center",
+                        truncate=True,
+                    )
+                ],
+                padding=padding,
+                align="center",
+                justify="center",
             ).render(ctx, x, y, width, header_height)
 
         # Draw chart
@@ -104,7 +173,7 @@ class ChartDisplay(Component):
                     chart_rect, self.data, color=self.color, fill=self.fill, gradient=self.gradient
                 )
 
-                if self.show_range:
+                if show_range:
                     min_val = min(self.data)
                     max_val = max(self.data)
                     range_y = chart_bottom + int(height * 0.08)

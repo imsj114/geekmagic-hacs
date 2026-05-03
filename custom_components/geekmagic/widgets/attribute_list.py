@@ -132,20 +132,9 @@ class AttributeListDisplay(Component):
         """Render attribute list using component primitives."""
         padding = max(2, int(min(width, height) * 0.05))
 
-        # Estimate row height to know how many we can show.
-        sample_font = ctx.get_font("small")
-        _, row_h = ctx.get_text_size("Hg", sample_font)
-        row_h = max(row_h, 12)
-        gap = 4 if self.title else 2
-
-        inner_h = height - padding * 2
         # At narrow widths the title eats a row that would be better spent
         # on actual data; drop it.
         show_title = bool(self.title) and width >= 100
-        title_rows = 1 if show_title else 0
-
-        max_data_rows = max(1, (inner_h - title_rows * (row_h + gap)) // (row_h + gap))
-        items = self.items[:max_data_rows]
 
         rows: list[Component] = []
         if show_title:
@@ -159,7 +148,7 @@ class AttributeListDisplay(Component):
                 )
             )
 
-        for label, value, color in items:
+        for label, value, color in self.items:
             rows.append(
                 LabelValueRow(
                     label=label,
@@ -170,9 +159,12 @@ class AttributeListDisplay(Component):
                 )
             )
 
+        # Use a tight gap so all rows have a chance to fit before the flex
+        # shrink kicks in. Column will proportionally shrink each row's
+        # height if total content exceeds the container.
         Column(
             children=rows,
-            gap=gap,
+            gap=3 if show_title else 2,
             padding=padding,
             align="stretch",
             justify="start",

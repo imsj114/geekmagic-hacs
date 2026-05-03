@@ -187,6 +187,17 @@ class Node:
             for i, c in enumerate(self.children):
                 if c.flex_grow > 0:
                     main_size[i] = base_main[i] + free * c.flex_grow / total_grow
+        elif free < 0:
+            # Overflow: shrink all children proportionally so the total fits.
+            # CSS flex_shrink defaults to 1; we apply a uniform factor here,
+            # which is enough for the layouts this codebase uses (single
+            # level of children with no min-size constraints) and prevents
+            # siblings from being pushed off the end of the container.
+            available = max(0.0, container_main - total_gap)
+            total_base = sum(base_main)
+            if total_base > 0:
+                factor = available / total_base
+                main_size = [b * factor for b in base_main]
 
         used = sum(main_size) + total_gap
         extra = container_main - used

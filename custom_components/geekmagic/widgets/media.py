@@ -197,7 +197,7 @@ class AlbumArt(Component):
                     color=(255, 255, 255),
                     bold=title_bold,
                     align="start",
-                    truncate=True,
+                    auto_fit=True,
                 )
             )
 
