@@ -22,6 +22,20 @@ if TYPE_CHECKING:
     from ..widgets.base import Widget
 
 
+def _blend(
+    base: tuple[int, int, int],
+    over: tuple[int, int, int],
+    alpha: float,
+) -> tuple[int, int, int]:
+    """Blend ``over`` onto ``base`` by ``alpha`` (0..1), returning RGB."""
+    a = max(0.0, min(1.0, alpha))
+    return (
+        int(base[0] + (over[0] - base[0]) * a),
+        int(base[1] + (over[1] - base[1]) * a),
+        int(base[2] + (over[2] - base[2]) * a),
+    )
+
+
 @dataclass
 class Slot:
     """Represents a widget slot in a layout."""
@@ -124,8 +138,9 @@ class Layout(ABC):
         """Render all widgets in the layout with clipping.
 
         Each widget is rendered to a temporary image first, then pasted
-        onto the main canvas. This ensures widgets cannot overflow their
-        slot boundaries.
+        onto the main canvas with a rounded-corner mask. After paste, a
+        thin colored accent rule and a soft top highlight are drawn on
+        each card to give the surface a printed-on feel.
 
         Args:
             renderer: Renderer instance
@@ -135,10 +150,23 @@ class Layout(ABC):
         # Get the main canvas from the draw object
         canvas = draw._image  # noqa: SLF001
         scale = renderer.scale
+        theme = self.theme
+
+        # Repaint the canvas with theme background so the gap between cards
+        # uses the theme color (not the default black). This makes themes
+        # like ocean/sunset/light/forest read correctly.
+        canvas_draw = PILImageDraw.Draw(canvas)
+        canvas_draw.rectangle((0, 0, canvas.width, canvas.height), fill=theme.background)
 
         # Default empty states dict
         if widget_states is None:
             widget_states = {}
+
+        # Corner radius for cell masking (in scaled pixels). The fullscreen
+        # layout uses 0 padding/gap and should not get rounded corners.
+        scaled_radius = max(0, int(theme.corner_radius * scale))
+        if self.padding == 0 and self.gap == 0:
+            scaled_radius = 0
 
         for slot in self.slots:
             widget = slot.widget
@@ -151,13 +179,13 @@ class Layout(ABC):
             slot_height = (y2 - y1) * scale
 
             # Create temporary image for this widget using theme's surface color
-            temp_img = Image.new("RGB", (slot_width, slot_height), self.theme.surface)
+            temp_img = Image.new("RGB", (slot_width, slot_height), theme.surface)
             temp_draw = PILImageDraw.Draw(temp_img)
 
             # Create render context with local coordinates (0, 0 to width, height)
             # The rect is relative to the temp image, not the main canvas
             local_rect = (0, 0, x2 - x1, y2 - y1)
-            ctx = RenderContext(temp_draw, local_rect, renderer, theme=self.theme)
+            ctx = RenderContext(temp_draw, local_rect, renderer, theme=theme)
 
             # Get widget state for this slot
             state = widget_states.get(slot.index, WidgetState())
@@ -169,13 +197,74 @@ class Layout(ABC):
             if isinstance(result, Component):
                 result.render(ctx, 0, 0, x2 - x1, y2 - y1)
 
-            # Paste the widget image onto the main canvas at the slot position
+            # Apply card chrome (highlight + accent bar) before masking so
+            # the rounded mask clips the chrome to the card shape.
+            self._apply_card_chrome(temp_img, slot.index, scale)
+
+            # Paste the widget image onto the main canvas with a rounded
+            # mask so the surface has actual rounded corners.
             paste_x = x1 * scale
             paste_y = y1 * scale
-            canvas.paste(temp_img, (paste_x, paste_y))
+            if scaled_radius > 0:
+                mask = Image.new("L", (slot_width, slot_height), 0)
+                PILImageDraw.Draw(mask).rounded_rectangle(
+                    (0, 0, slot_width - 1, slot_height - 1),
+                    radius=scaled_radius,
+                    fill=255,
+                )
+                canvas.paste(temp_img, (paste_x, paste_y), mask)
+            else:
+                canvas.paste(temp_img, (paste_x, paste_y))
 
         # Apply theme visual effects after all widgets are rendered
         self._apply_theme_effects(canvas, scale)
+
+    def _apply_card_chrome(self, temp_img: Image.Image, slot_index: int, scale: int) -> None:
+        """Draw the per-card surface highlight and accent rule.
+
+        These two pieces of chrome are tiny but make a huge difference at
+        a glance: the highlight gives the card a subtle printed-on-glass
+        feel, and the accent rule color-codes the slot.
+
+        Args:
+            temp_img: The widget's temp image (modified in-place)
+            slot_index: Slot index, used to pick an accent color
+            scale: Supersampling scale factor
+        """
+        theme = self.theme
+        draw = PILImageDraw.Draw(temp_img)
+        w = temp_img.width
+        # Inset horizontally by ~corner radius so chrome does not poke
+        # past rounded corners after masking. We use a slightly tighter
+        # inset than radius to keep the chrome visually balanced.
+        inset = max(0, int(theme.corner_radius * scale * 0.55))
+
+        # 1) Soft top highlight: a 1px line just inside the top edge,
+        # blended toward white over the surface color. Skipped on light
+        # surfaces (where it would be invisible) by setting the theme
+        # field to 0.0.
+        if theme.surface_highlight > 0.0:
+            highlight = _blend(theme.surface, (255, 255, 255), theme.surface_highlight)
+            line_y = max(0, int(scale * 0.5))  # 1 scaled-px line near the top
+            draw.line(
+                [(inset, line_y), (w - 1 - inset, line_y)],
+                fill=highlight,
+                width=max(1, scale // 2),
+            )
+
+        # 2) Accent rule: a thin horizontal stripe at the top, colored
+        # by accent_colors[slot_index]. Inset to clear the rounded
+        # corners.
+        if theme.accent_bar_height > 0:
+            bar_h = max(1, theme.accent_bar_height * scale)
+            accent = theme.get_accent_color(slot_index)
+            # Draw the bar slightly below the very edge so the surface
+            # highlight sits between it and the cell rim.
+            bar_y0 = max(1, int(scale * 0.5)) + max(1, scale // 2)
+            draw.rectangle(
+                (inset, bar_y0, w - 1 - inset, bar_y0 + bar_h - 1),
+                fill=accent,
+            )
 
     def _apply_theme_effects(self, canvas: Image.Image, scale: int) -> None:
         """Apply theme-specific visual effects to the rendered canvas.

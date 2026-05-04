@@ -98,6 +98,17 @@ class Theme:
     scanlines: bool = False
     invert_bars: bool = False
 
+    # Surface chrome (per-card accents and highlights)
+    # accent_bar_height in pixels: a colored rule along the top inside edge
+    # of every widget surface, picked from accent_colors by slot index.
+    # 0 disables it. Themes that already saturate the screen (retro, neon)
+    # can disable it to avoid visual noise.
+    accent_bar_height: int = 2
+    # surface_highlight: subtle 1px white-alpha line just inside the top of
+    # the card to give a printed-on-glass feel. Tuple = blend factor over
+    # surface (0.0 disables).
+    surface_highlight: float = 0.06
+
     # Progress/gauge bar styling
     bar_background: Color = (50, 50, 50)
 
@@ -168,6 +179,9 @@ THEME_MINIMAL = Theme(
     value_bold=False,
     label_weight="light",
     bar_background=(40, 40, 40),
+    # Minimal is intentionally chrome-free
+    accent_bar_height=0,
+    surface_highlight=0.0,
 )
 
 # 3. Neon - Cyberpunk with glow effects
@@ -199,6 +213,9 @@ THEME_NEON = Theme(
     border_style="solid",
     glow_effect=True,
     bar_background=(20, 20, 40),
+    # Neon already has high-saturation borders — accent bar would be noise
+    accent_bar_height=0,
+    surface_highlight=0.0,
 )
 
 # 4. Retro - Terminal/CRT style
@@ -230,6 +247,9 @@ THEME_RETRO = Theme(
     scanlines=True,
     invert_bars=True,
     bar_background=(0, 40, 0),
+    # Retro is monochromatic by design
+    accent_bar_height=0,
+    surface_highlight=0.0,
 )
 
 # 5. Soft - Rounded, muted, cozy
@@ -297,6 +317,8 @@ THEME_LIGHT = Theme(
     widget_padding=6,
     gap=6,
     bar_background=(235, 235, 240),
+    # Light theme: highlight would be invisible on white; accent bar still works
+    surface_highlight=0.0,
 )
 
 # 7. Ocean - Deep blue nautical theme
@@ -420,6 +442,9 @@ THEME_CANDY = Theme(
     widget_padding=8,
     gap=8,
     bar_background=(255, 220, 235),
+    # Candy is light + already vibrant; skip extra chrome
+    accent_bar_height=0,
+    surface_highlight=0.0,
 )
 
 
