@@ -243,77 +243,66 @@ class StatusListDisplay(Component):
         return (max_width, max_height)
 
     def render(self, ctx: RenderContext, x: int, y: int, width: int, height: int) -> None:
-        """Render status list using component primitives."""
+        """Render status list (watchOS list pattern: caps-tracked title,
+        tinted dot per row, semibold name, status state as a tinted accent
+        on the right; thin separator lines between rows).
+        """
         padding = int(width * 0.05)
-
-        # Build list of rows
-        rows: list[Component] = []
-
-        # Add title if provided
-        if self.title:
-            rows.append(
-                Text(
-                    text=self.title.upper(),
-                    font="small",
-                    color=THEME_TEXT_SECONDARY,
-                    align="start",
-                )
-            )
-
-        # Calculate dimensions for items
-        available_height = height - padding * 2
-        if self.title:
-            available_height -= int(height * 0.15)
-
         row_count = len(self.items) or 1
-        row_height = min(int(height * 0.17), available_height // row_count)
-        icon_size = max(10, min(16, int(row_height * 0.7)))
+        title_h = int(height * 0.15) if self.title else 0
+        available_height = height - padding * 2 - title_h
+        row_height = max(14, available_height // row_count)
+        icon_size = max(10, min(18, int(row_height * 0.68)))
         max_len = estimate_max_chars(width, char_width=7, padding=30)
 
-        # Build each item row
-        for label, is_on, on_color, off_color, icon in self.items:
+        # Caps-tracked title at the top
+        if self.title:
+            ctx.draw_label(
+                self.title,
+                (x + padding, y + padding),
+                color=ctx.theme.text_secondary,
+                anchor="lt",
+                size="tertiary",
+            )
+
+        # Render items, drawing a 1px separator line above each (except first).
+        sep_color = ctx.theme.border
+        list_top = y + padding + title_h
+        for i, (label, is_on, on_color, off_color, icon) in enumerate(self.items):
             color = on_color if is_on else off_color
             display_label = truncate_text(label, max_len, style="middle")
+            row_y = list_top + i * row_height
 
-            # Build row children
-            row_children = []
+            # Separator before all rows except the first
+            if i > 0:
+                ctx.draw_line(
+                    [(x + padding, row_y), (x + width - padding, row_y)],
+                    fill=sep_color,
+                    width=1,
+                )
 
-            # Add icon if provided
+            row_children: list[Component] = []
             if icon:
                 row_children.append(Icon(name=icon, size=icon_size, color=color))
-
-            # Add label
             row_children.append(
                 Text(text=display_label, font="tiny", color=THEME_TEXT_PRIMARY, align="start")
             )
 
-            # Add status text if configured
             if self.on_text or self.off_text:
                 status_text = self.on_text if is_on else self.off_text
                 if status_text:
                     row_children.append(Spacer())
                     row_children.append(
-                        Text(text=status_text, font="tiny", color=color, align="end")
+                        Text(text=status_text, font="tiny", bold=True, color=color, align="end")
                     )
 
-            # Create row component
-            rows.append(
-                Row(
-                    children=row_children,
-                    gap=6,
-                    align="center",
-                    justify="start",
-                )
-            )
-
-        # Render all rows in a column
-        Column(
-            children=rows,
-            gap=4 if self.title else 2,
-            padding=padding,
-            align="stretch",
-            justify="start",
-        ).render(ctx, x, y, width, height)
+            Row(
+                children=row_children,
+                gap=6,
+                align="center",
+                justify="start",
+                padding=2,
+            ).render(ctx, x + padding, row_y, width - padding * 2, row_height)
 
 
 class StatusListWidget(Widget):
