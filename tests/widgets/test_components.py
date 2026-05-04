@@ -11,6 +11,7 @@ from custom_components.geekmagic.widgets.components import (
     Bar,
     Column,
     Empty,
+    Flex,
     Icon,
     Padding,
     Ring,
@@ -297,3 +298,219 @@ class TestPadding:
         w, h = padded.measure(mock_ctx, 200, 100)
         assert w == 40 + 10 + 20  # text + right + left
         assert h == 16 + 5 + 15  # text + top + bottom
+
+
+class _SizedComponent(Bar):
+    """A Bar subclass that records what render coordinates it received.
+
+    Bar already returns (max_width, h) from measure, which is exactly the
+    behaviour Flex relies on, so we reuse it as a probe for the layout.
+    """
+
+    def __post_init__(self) -> None:
+        self.rendered_at: tuple[int, int, int, int] | None = None
+
+    def render(self, ctx: object, x: int, y: int, width: int, height: int) -> None:
+        self.rendered_at = (x, y, width, height)
+
+
+class TestFlexInRow:
+    """Flex children should consume the remaining main-axis space in Row."""
+
+    @pytest.fixture
+    def real_ctx(self) -> MagicMock:
+        ctx = MagicMock()
+        ctx.width = 200
+        ctx.height = 50
+        ctx.theme.bar_background = (40, 40, 40)
+        ctx.theme.text_primary = (255, 255, 255)
+        ctx.theme.text_secondary = (150, 150, 150)
+        ctx.get_font.return_value = MagicMock()
+        # Fixed-size text so the math is predictable.
+        ctx.get_text_size.return_value = (20, 10)
+        return ctx
+
+    def test_flex_gets_remaining_width(self, real_ctx: MagicMock) -> None:
+        """Row with [Icon(20), Flex(Bar), Text(20)] gives Flex what's left."""
+        bar_probe = _SizedComponent(percent=50)
+        row = Row(
+            children=[
+                Icon("temp", size=20),
+                Flex(bar_probe),
+                Text("85%", font="tiny"),
+            ],
+            gap=4,
+        )
+        row.render(real_ctx, 0, 0, 200, 30)
+        # 200 - 20(icon) - 20(text) - 4*2(gaps) = 152
+        assert bar_probe.rendered_at is not None
+        assert bar_probe.rendered_at[2] == 152
+
+    def test_flex_with_no_room_collapses_to_zero(self, real_ctx: MagicMock) -> None:
+        """When fixed siblings already overflow, Flex shrinks to 0."""
+        bar_probe = _SizedComponent(percent=50)
+        row = Row(
+            children=[
+                Icon("a", size=80),
+                Flex(bar_probe),
+                Icon("b", size=80),
+            ],
+            gap=4,
+        )
+        row.render(real_ctx, 0, 0, 100, 30)
+        # 80 + 80 + 8(gaps) = 168 > 100; Flex (AUTO base) stays at 0.
+        assert bar_probe.rendered_at is not None
+        assert bar_probe.rendered_at[2] == 0
+
+
+class TestFlexInColumn:
+    @pytest.fixture
+    def real_ctx(self) -> MagicMock:
+        ctx = MagicMock()
+        ctx.width = 100
+        ctx.height = 200
+        ctx.theme.bar_background = (40, 40, 40)
+        ctx.theme.text_primary = (255, 255, 255)
+        ctx.theme.text_secondary = (150, 150, 150)
+        ctx.get_font.return_value = MagicMock()
+        ctx.get_text_size.return_value = (20, 10)
+        return ctx
+
+    def test_flex_gets_remaining_height(self, real_ctx: MagicMock) -> None:
+        bar_probe = _SizedComponent(percent=50, height=20)
+        col = Column(
+            children=[
+                Icon("a", size=30),
+                Flex(bar_probe),
+                Icon("b", size=30),
+            ],
+            gap=5,
+        )
+        col.render(real_ctx, 0, 0, 100, 200)
+        # 200 - 30 - 30 - 5*2 = 130
+        assert bar_probe.rendered_at is not None
+        assert bar_probe.rendered_at[3] == 130
+
+
+class TestTextAutoFit:
+    """auto_fit should walk the shrink chain before giving up to truncation."""
+
+    def _ctx_with_widths(self, widths: dict[str, int]) -> MagicMock:
+        ctx = MagicMock()
+        ctx.theme.text_primary = (255, 255, 255)
+        ctx.theme.text_secondary = (150, 150, 150)
+        # Each font-name lookup returns a sentinel object so we can route
+        # get_text_size by which font it was given.
+        font_objs: dict[str, MagicMock] = {}
+
+        def get_font(name: str, bold: bool = False, adjust: int = 0) -> MagicMock:
+            return font_objs.setdefault(name, MagicMock(name=f"font:{name}"))
+
+        def get_text_size(text: str, font: MagicMock) -> tuple[int, int]:
+            for name, obj in font_objs.items():
+                if obj is font:
+                    return (widths.get(name, 0), 10)
+            return (0, 10)
+
+        ctx.get_font.side_effect = get_font
+        ctx.get_text_size.side_effect = get_text_size
+        return ctx
+
+    def test_picks_largest_font_that_fits(self) -> None:
+        # "regular" too wide, "small" fits — should pick "small".
+        ctx = self._ctx_with_widths(
+            {"regular": 100, "secondary": 90, "small": 60, "tertiary": 50, "tiny": 40}
+        )
+        text = Text(text="x", font="regular", auto_fit=True)
+        font = text._pick_font(ctx, max_width=70)
+        assert font is ctx.get_font("small")
+
+    def test_falls_back_to_smallest_font_when_nothing_fits(self) -> None:
+        ctx = self._ctx_with_widths(
+            {"regular": 100, "secondary": 90, "small": 80, "tertiary": 70, "tiny": 60}
+        )
+        text = Text(text="x", font="regular", auto_fit=True)
+        # Even "tiny" (60) doesn't fit in 30; should still return tiny so
+        # the truncation pass at render-time can ellipsize a short string.
+        font = text._pick_font(ctx, max_width=30)
+        assert font is ctx.get_font("tiny")
+
+    def test_unknown_font_uses_fallback_chain(self) -> None:
+        ctx = self._ctx_with_widths({"weird-font": 200, "small": 50, "tiny": 40})
+        text = Text(text="x", font="weird-font", auto_fit=True)
+        # weird-font (200) doesn't fit, small (50) does → picks small.
+        font = text._pick_font(ctx, max_width=80)
+        assert font is ctx.get_font("small")
+
+
+class TestTextTruncate:
+    @pytest.fixture
+    def ctx(self) -> MagicMock:
+        ctx = MagicMock()
+        ctx.theme.text_primary = (255, 255, 255)
+        ctx.theme.text_secondary = (150, 150, 150)
+        ctx.get_font.return_value = MagicMock()
+        # Each character is 5 px wide, "…" is 4 px.
+        ctx.get_text_size.side_effect = lambda text, font: (
+            (4 if text == "…" else len(text) * 5),
+            10,
+        )
+        return ctx
+
+    def test_returns_text_unchanged_when_fits(self, ctx: MagicMock) -> None:
+        text = Text(text="hello")
+        out = text._truncate_text(ctx, "hello", ctx.get_font(), max_width=100)
+        assert out == "hello"
+
+    def test_returns_ellipsis_for_zero_width(self, ctx: MagicMock) -> None:
+        text = Text(text="hello")
+        assert text._truncate_text(ctx, "hello", ctx.get_font(), max_width=0) == ""
+
+    def test_returns_ellipsis_when_single_char_too_wide(self, ctx: MagicMock) -> None:
+        # "M" is 5 wide, max_width 3 — loop body never executes (len==1),
+        # falls through to the bare ellipsis return.
+        text = Text(text="M")
+        out = text._truncate_text(ctx, "M", ctx.get_font(), max_width=3)
+        assert out == "…"
+
+    def test_truncates_with_ellipsis(self, ctx: MagicMock) -> None:
+        # "Downtown" is 40 wide; budget 24 should give "Down…" (5 chars at
+        # 4 wide each + 4 ellipsis = 24).
+        text = Text(text="Downtown")
+        out = text._truncate_text(ctx, "Downtown", ctx.get_font(), max_width=24)
+        assert out.endswith("…")
+        assert len(out) <= len("Downtown")
+
+
+class TestAdaptiveMeasure:
+    """Adaptive.measure must report the same dimensions it will render at.
+
+    Otherwise the outer container under-budgets height when Adaptive falls
+    back to Column, and the contents overflow into siblings.
+    """
+
+    @pytest.fixture
+    def ctx(self) -> MagicMock:
+        ctx = MagicMock()
+        ctx.theme.text_primary = (255, 255, 255)
+        ctx.theme.text_secondary = (150, 150, 150)
+        ctx.get_font.return_value = MagicMock()
+        # Each Text("X") is 30 wide, 10 tall.
+        ctx.get_text_size.return_value = (30, 10)
+        return ctx
+
+    def test_measure_returns_row_size_when_fits(self, ctx: MagicMock) -> None:
+        # Two 30-wide texts + 6 gap = 66; container width 100 → fits as Row.
+        adaptive = Adaptive(children=[Text("a"), Text("b")], gap=6)
+        w, h = adaptive.measure(ctx, max_width=100, max_height=50)
+        # Row.measure returns total_w (66) and max child h (10).
+        assert (w, h) == (66, 10)
+
+    def test_measure_returns_column_size_when_doesnt_fit(self, ctx: MagicMock) -> None:
+        # Same children but a 50px container — total width 66 > 50, so
+        # Adaptive should fall back to Column and report the COLUMN size.
+        adaptive = Adaptive(children=[Text("a"), Text("b")], gap=6)
+        w, h = adaptive.measure(ctx, max_width=50, max_height=100)
+        # Column.measure returns max child width (30) and total height
+        # (10 + 6 + 10 = 26).
+        assert (w, h) == (30, 26)

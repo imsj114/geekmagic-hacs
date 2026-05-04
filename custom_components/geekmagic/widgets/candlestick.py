@@ -6,8 +6,9 @@ import contextlib
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, ClassVar
 
+from ._header import header_height_for, header_mode, render_label_value_header
 from .base import Widget, WidgetConfig
-from .components import THEME_TEXT_SECONDARY, Color, Component, Row, Spacer, Text
+from .components import THEME_TEXT_SECONDARY, Color, Component
 
 if TYPE_CHECKING:
     from ..render_context import RenderContext
@@ -100,9 +101,18 @@ class CandlestickDisplay(Component):
         """Render candlestick chart with header and candles."""
         font_label = ctx.get_font("small")
         padding = int(width * 0.08)
+        inner_w = width - padding * 2
 
-        # Calculate chart area
-        header_height = int(height * 0.15) if self.label else int(height * 0.08)
+        value_str = (
+            f"{self.current_value:.1f}{self.unit}"
+            if self.show_value and self.current_value is not None
+            else ""
+        )
+        mode = header_mode(ctx, label=self.label, value=value_str, inner_w=inner_w, height=height)
+        _, label_h = ctx.get_text_size("Hg", font_label) if self.label else (0, 0)
+        _, value_h = ctx.get_text_size("Hg", ctx.get_font("regular")) if value_str else (0, 0)
+        header_height = header_height_for(mode, label_h=label_h, value_h=value_h, height=height)
+
         footer_height = int(height * 0.04)
         chart_top = y + header_height
         chart_bottom = y + height - footer_height
@@ -111,38 +121,24 @@ class CandlestickDisplay(Component):
         chart_height = chart_bottom - chart_top
         chart_width = chart_right - chart_left
 
-        # Build header using declarative components
-        header_children: list[Component] = []
-        if self.label:
-            header_children.append(
-                Text(
-                    text=self.label.upper(),
-                    font="small",
-                    color=THEME_TEXT_SECONDARY,
-                    align="start",
-                    truncate=True,
-                )
-            )
-        if self.show_value and self.current_value is not None:
-            value_str = f"{self.current_value:.1f}{self.unit}"
-            if self.label:
-                header_children.append(Spacer())
-            # Color the value based on last candle direction
-            value_color: Color = THEME_TEXT_SECONDARY
-            if self.data:
-                last = self.data[-1]
-                value_color = ctx.theme.success if last[3] >= last[0] else ctx.theme.error
-            header_children.append(
-                Text(text=value_str, font="regular", color=value_color, align="end")
-            )
+        # Value color reflects the most recent candle direction.
+        value_color: Color = THEME_TEXT_SECONDARY
+        if self.data:
+            last = self.data[-1]
+            value_color = ctx.theme.success if last[3] >= last[0] else ctx.theme.error
 
-        if header_children:
-            Row(
-                children=header_children,
-                gap=4,
-                padding=padding,
-                align="center",
-            ).render(ctx, x, y, width, header_height)
+        render_label_value_header(
+            ctx,
+            x,
+            y,
+            width,
+            header_height,
+            mode=mode,
+            label=self.label,
+            value=value_str,
+            value_color=value_color,
+            padding=padding,
+        )
 
         # Draw candles
         if not self.data:

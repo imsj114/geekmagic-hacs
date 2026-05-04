@@ -15,6 +15,7 @@ from .components import (
     Color,
     Column,
     Component,
+    Flex,
     Icon,
     Row,
     Spacer,
@@ -61,7 +62,7 @@ class ProgressDisplay(Component):
 
     def render(self, ctx: RenderContext, x: int, y: int, width: int, height: int) -> None:
         """Render progress display."""
-        padding = int(width * 0.05)
+        padding = max(2, int(min(width, height) * 0.05))
         bar_height_mult = self.BAR_HEIGHT_MULTIPLIERS.get(self.bar_height_style, 0.17)
         bar_height = max(4, int(height * bar_height_mult))
 
@@ -71,18 +72,42 @@ class ProgressDisplay(Component):
         display_target = format_number(target)
         percent = min(100, (self.value / target) * 100) if target > 0 else 0
 
-        value_text = f"{display_value}/{display_target}" if self.show_target else display_value
-        if self.unit:
-            value_text += f" {self.unit}"
-        label_text = self.label.upper()
+        # Layout strategy is driven by both axes:
+        # - is_expanded: enough room for a 3-line vertical stack (label, big
+        #   value, bar+percent). Used whenever vertical space is plentiful.
+        # - is_narrow: width too small for a horizontal "icon + label + value"
+        #   header. Forces vertical even on smaller heights.
+        # - is_compact: extreme tightness — icon+value on one line, bar+% on
+        #   the next.
+        h_size = get_size_category(height)
+        is_expanded = h_size in (SizeCategory.MEDIUM, SizeCategory.LARGE)
+        is_compact = h_size == SizeCategory.MICRO
+        is_narrow = width < 95
 
-        # Adaptive layout based on size using standard size categories
-        # Compact: MICRO cells in dense grids
-        # Standard: TINY/SMALL cells, horizontal layout
-        # Expanded: MEDIUM/LARGE cells, vertical layout with icon/label separate from value
-        size = get_size_category(height)
-        is_compact = size == SizeCategory.MICRO
-        is_expanded = size in (SizeCategory.MEDIUM, SizeCategory.LARGE)
+        # If narrow but with enough vertical room for 3 lines, prefer expanded.
+        if is_narrow and height >= 90:
+            is_expanded = True
+            is_compact = False
+
+        value_text = f"{display_value}/{display_target}" if self.show_target else display_value
+        # The unit is the lowest-priority part of the value string — only
+        # add it when we have enough horizontal room. We compute width-with
+        # and width-without and pick the with-unit version unless it would
+        # overflow the value's likely allocation.
+        if self.unit:
+            font_value = ctx.get_font("regular" if is_expanded else "small", bold=False)
+            with_unit = f"{value_text} {self.unit}"
+            value_with_unit_w, _ = ctx.get_text_size(with_unit, font_value)
+            # Estimated horizontal budget for the value text:
+            # - expanded layouts give the value its own row, so the budget
+            #   is roughly the inner width minus a small margin.
+            # - other layouts share the row with an icon + label, so use
+            #   ~50% of the inner width.
+            inner_w = width - max(2, int(min(width, height) * 0.05)) * 2
+            value_budget = inner_w - 8 if is_expanded else int(inner_w * 0.55)
+            if value_with_unit_w <= value_budget:
+                value_text = with_unit
+        label_text = self.label.upper()
 
         if is_expanded:
             # Expanded: icon + label on top, value below, bar + percent at bottom
@@ -93,13 +118,26 @@ class ProgressDisplay(Component):
             if self.icon:
                 header_children.append(Icon(name=self.icon, size=icon_size, color=self.color))
             header_children.append(
-                Text(text=label_text, font="small", color=THEME_TEXT_SECONDARY, align="center")
+                Text(
+                    text=label_text,
+                    font="small",
+                    color=THEME_TEXT_SECONDARY,
+                    align="center",
+                    truncate=True,
+                )
             )
 
-            # Row 2: Value (centered, larger)
+            # Row 2: Value (centered, larger). Auto-fit so long values shrink
+            # rather than overflow the container on narrow widgets.
             value_row = Row(
                 children=[
-                    Text(text=value_text, font="large", color=THEME_TEXT_PRIMARY, align="center")
+                    Text(
+                        text=value_text,
+                        font="large",
+                        color=THEME_TEXT_PRIMARY,
+                        align="center",
+                        auto_fit=True,
+                    )
                 ],
                 justify="center",
                 padding=padding,
@@ -108,11 +146,13 @@ class ProgressDisplay(Component):
             # Row 3: Bar + Percent
             bar_row = Row(
                 children=[
-                    Bar(
-                        percent=percent,
-                        color=self.color,
-                        background=COLOR_DARK_GRAY,
-                        height=bar_height,
+                    Flex(
+                        Bar(
+                            percent=percent,
+                            color=self.color,
+                            background=COLOR_DARK_GRAY,
+                            height=bar_height,
+                        )
                     ),
                     Text(
                         text=f"{percent:.0f}%", font="small", color=THEME_TEXT_PRIMARY, align="end"
@@ -142,15 +182,25 @@ class ProgressDisplay(Component):
             if self.icon:
                 row1_children.append(Icon(name=self.icon, size=icon_size, color=self.color))
             row1_children.append(
-                Text(text=value_text, font="small", color=THEME_TEXT_PRIMARY, align="start")
+                Flex(
+                    Text(
+                        text=value_text,
+                        font="small",
+                        color=THEME_TEXT_PRIMARY,
+                        align="start",
+                        auto_fit=True,
+                    )
+                )
             )
 
             row2_children: list[Component] = [
-                Bar(
-                    percent=percent,
-                    color=self.color,
-                    background=COLOR_DARK_GRAY,
-                    height=bar_height,
+                Flex(
+                    Bar(
+                        percent=percent,
+                        color=self.color,
+                        background=COLOR_DARK_GRAY,
+                        height=bar_height,
+                    )
                 ),
                 Text(text=f"{percent:.0f}%", font="tiny", color=THEME_TEXT_PRIMARY, align="end"),
             ]
@@ -185,25 +235,43 @@ class ProgressDisplay(Component):
                 top_row_children.extend(
                     [
                         Text(
-                            text=label_text, font="small", color=THEME_TEXT_SECONDARY, align="start"
+                            text=label_text,
+                            font="small",
+                            color=THEME_TEXT_SECONDARY,
+                            align="start",
+                            truncate=True,
                         ),
                         Spacer(),
                         Text(
-                            text=value_text, font="regular", color=THEME_TEXT_PRIMARY, align="end"
+                            text=value_text,
+                            font="regular",
+                            color=THEME_TEXT_PRIMARY,
+                            align="end",
+                            auto_fit=True,
                         ),
                     ]
                 )
             else:
                 top_row_children.append(
-                    Text(text=value_text, font="regular", color=THEME_TEXT_PRIMARY, align="start")
+                    Flex(
+                        Text(
+                            text=value_text,
+                            font="regular",
+                            color=THEME_TEXT_PRIMARY,
+                            align="start",
+                            auto_fit=True,
+                        )
+                    )
                 )
 
             bottom_row_children: list[Component] = [
-                Bar(
-                    percent=percent,
-                    color=self.color,
-                    background=COLOR_DARK_GRAY,
-                    height=bar_height,
+                Flex(
+                    Bar(
+                        percent=percent,
+                        color=self.color,
+                        background=COLOR_DARK_GRAY,
+                        height=bar_height,
+                    )
                 ),
                 Text(text=f"{percent:.0f}%", font="small", color=THEME_TEXT_PRIMARY, align="end"),
             ]
@@ -348,7 +416,9 @@ class MultiProgressDisplay(Component):
 
             # Bottom row: Bar + Percent
             bottom_row_children = [
-                Bar(percent=percent, color=color, background=COLOR_DARK_GRAY, height=bar_height),
+                Flex(
+                    Bar(percent=percent, color=color, background=COLOR_DARK_GRAY, height=bar_height)
+                ),
                 Text(text=f"{percent:.0f}%", font="tiny", color=THEME_TEXT_PRIMARY, align="end"),
             ]
 

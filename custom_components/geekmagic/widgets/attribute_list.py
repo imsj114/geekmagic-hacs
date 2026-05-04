@@ -76,48 +76,45 @@ class LabelValueRow(Component):
             # Everything fits - no truncation needed
             display_label = self.label
             display_value = self.value
-            # Position: label at start, value at end
-            label_x = x
-            value_x = x + width
+        elif value_width >= int(width * 0.7):
+            # Drop the label entirely if the value alone barely fits — the
+            # value carries the actual information, and "Arr… 5 m…" is worse
+            # than just "5 min".
+            display_label = ""
+            display_value = self._truncate_to_width(ctx, self.value, value_font, width)
+        elif value_width <= available:
+            # Value fits in full; give the rest to a truncated label.
+            display_label = self._truncate_to_width(
+                ctx, self.label, label_font, available - value_width
+            )
+            display_value = self.value
         else:
-            # Need to truncate - allocate space proportionally
-            # Give slightly more space to value (40% label, 60% value when both overflow)
-            label_max = int(available * 0.40)
-            value_max = available - label_max
-
-            # But if one side doesn't need its full allocation, give extra to the other
-            if label_width <= label_max:
-                # Label fits, give remaining to value
-                value_max = available - label_width
-                display_label = self.label
-            elif value_width <= value_max:
-                # Value fits, give remaining to label
-                label_max = available - value_width
-                display_label = self._truncate_to_width(ctx, self.label, label_font, label_max)
-            else:
-                # Both need truncation
-                display_label = self._truncate_to_width(ctx, self.label, label_font, label_max)
-
+            # Value doesn't fit either — give value 60% of available width,
+            # label 40%, and truncate both.
+            value_max = max(int(available * 0.60), available - label_width)
+            label_max = available - value_max
+            display_label = self._truncate_to_width(ctx, self.label, label_font, label_max)
             display_value = self._truncate_to_width(ctx, self.value, value_font, value_max)
-            label_x = x
-            value_x = x + width
 
         # Draw label (left-aligned)
-        ctx.draw_text(
-            display_label,
-            (label_x, y + height // 2),
-            label_font,
-            label_color,
-            anchor="lm",
-        )
+        if display_label:
+            ctx.draw_text(
+                display_label,
+                (x, y + height // 2),
+                label_font,
+                label_color,
+                anchor="lm",
+            )
 
-        # Draw value (right-aligned)
+        # Draw value (right-aligned when there's a label, else left-aligned)
+        anchor = "rm" if display_label else "lm"
+        value_x = x + width if display_label else x
         ctx.draw_text(
             display_value,
             (value_x, y + height // 2),
             value_font,
             value_color,
-            anchor="rm",
+            anchor=anchor,
         )
 
 
@@ -133,13 +130,14 @@ class AttributeListDisplay(Component):
 
     def render(self, ctx: RenderContext, x: int, y: int, width: int, height: int) -> None:
         """Render attribute list using component primitives."""
-        padding = int(width * 0.05)
+        padding = max(2, int(min(width, height) * 0.05))
 
-        # Build list of rows
+        # At narrow widths the title eats a row that would be better spent
+        # on actual data; drop it.
+        show_title = bool(self.title) and width >= 100
+
         rows: list[Component] = []
-
-        # Add title if provided
-        if self.title:
+        if show_title:
             rows.append(
                 Text(
                     text=self.title.upper(),
@@ -150,7 +148,6 @@ class AttributeListDisplay(Component):
                 )
             )
 
-        # Build each item row using LabelValueRow for proper truncation
         for label, value, color in self.items:
             rows.append(
                 LabelValueRow(
@@ -162,10 +159,12 @@ class AttributeListDisplay(Component):
                 )
             )
 
-        # Render all rows in a column
+        # Use a tight gap so all rows have a chance to fit before the flex
+        # shrink kicks in. Column will proportionally shrink each row's
+        # height if total content exceeds the container.
         Column(
             children=rows,
-            gap=4 if self.title else 2,
+            gap=3 if show_title else 2,
             padding=padding,
             align="stretch",
             justify="start",

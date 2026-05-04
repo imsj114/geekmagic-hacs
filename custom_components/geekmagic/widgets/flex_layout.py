@@ -1,8 +1,7 @@
-"""Flexbox layout helpers using Stretchable (Taffy bindings).
+"""Flexbox layout helpers.
 
-This module provides CSS Flexbox layout calculations for widget rendering.
-Stretchable gives us a battle-tested layout engine for automatic element
-positioning and responsive design.
+Provides CSS-flexbox-style layout calculations for widget rendering on top
+of the small in-tree flex solver in :mod:`._flex`.
 """
 
 from __future__ import annotations
@@ -11,13 +10,14 @@ from dataclasses import dataclass
 from enum import IntEnum
 from typing import TYPE_CHECKING
 
-from stretchable import Edge, Node
-from stretchable.style import (
+from ._flex import (
     AUTO,
     PCT,
     AlignItems,
+    Edge,
     FlexDirection,
     JustifyContent,
+    Node,
 )
 
 if TYPE_CHECKING:
@@ -100,10 +100,10 @@ def create_vertical_layout(
         node = root.find(f"/{name}")
         box = node.get_box(Edge.CONTENT)
         result[name] = LayoutBox(
-            x=int(box.x),
-            y=int(box.y),
-            width=int(box.width),
-            height=int(box.height),
+            x=round(box.x),
+            y=round(box.y),
+            width=round(box.width),
+            height=round(box.height),
         )
 
     return result
@@ -151,10 +151,10 @@ def create_horizontal_layout(
         node = root.find(f"/{name}")
         box = node.get_box(Edge.CONTENT)
         result[name] = LayoutBox(
-            x=int(box.x),
-            y=int(box.y),
-            width=int(box.width),
-            height=int(box.height),
+            x=round(box.x),
+            y=round(box.y),
+            width=round(box.width),
+            height=round(box.height),
         )
 
     return result

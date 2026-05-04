@@ -55,8 +55,13 @@ class StatusIndicator(Component):
         color = self.on_color if self.is_on else self.off_color
         status_text = self.on_text if self.is_on else self.off_text
 
-        # Use vertical layout with prominent icon for larger cells
-        if size in (SizeCategory.MEDIUM, SizeCategory.LARGE) and self.icon:
+        # Vertical layout when there's enough vertical room — either because
+        # the cell is naturally tall (MEDIUM/LARGE) or because the cell is
+        # narrow-but-tall, where horizontal would crush icon + label + state.
+        prefer_vertical = size in (SizeCategory.MEDIUM, SizeCategory.LARGE) or (
+            width < 90 and height >= 80
+        )
+        if prefer_vertical and self.icon:
             self._render_vertical(ctx, x, y, width, height, color, status_text)
         else:
             self._render_horizontal(ctx, x, y, width, height, color, status_text)
@@ -113,24 +118,40 @@ class StatusIndicator(Component):
         padding = int(width * 0.06)
         icon_size = max(12, min(24, int(height * 0.35)))
 
-        # Truncate name
-        max_name_len = estimate_max_chars(width, char_width=7, padding=20)
-        name = truncate_text(self.name, max_name_len, style="middle")
+        # Decide whether the on/off status text fits alongside name + icon.
+        # If the name + status couldn't fit even as truncated 3-char
+        # words, drop the status: the icon's color already conveys the
+        # state and a readable name is more useful than a truncated state.
+        font_bold = ctx.get_font("small", bold=True)
+        icon_w = (icon_size + 6) if self.icon else 0
+        inner_w = width - padding * 2 - icon_w
+        status_w, _ = ctx.get_text_size(status_text, font_bold)
+        # 24px ≈ "name…" minimum readable width for the name on the left.
+        show_status = self.show_status_text and status_w + 24 <= inner_w
 
-        # Build component tree
         children: list[Component] = []
-
-        # Add icon if provided
         if self.icon:
             children.append(Icon(name=self.icon, size=icon_size, color=color))
-
-        # Add name text
-        children.append(Text(text=name, font="small", color=THEME_TEXT_PRIMARY, align="start"))
-
-        # Add spacer to push status text to the right
-        if self.show_status_text:
+        children.append(
+            Text(
+                text=self.name,
+                font="small",
+                color=THEME_TEXT_PRIMARY,
+                align="start",
+                truncate=True,
+            )
+        )
+        if show_status:
             children.append(Spacer())
-            children.append(Text(text=status_text, font="small", color=color, align="end"))
+            children.append(
+                Text(
+                    text=status_text,
+                    font="small",
+                    color=color,
+                    align="end",
+                    bold=True,
+                )
+            )
 
         # Render as a row
         Row(

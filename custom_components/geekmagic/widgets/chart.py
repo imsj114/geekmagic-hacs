@@ -7,8 +7,9 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, ClassVar
 
 from ..const import COLOR_CYAN  # Used as component dataclass default
+from ._header import header_height_for, header_mode, render_label_value_header
 from .base import Widget, WidgetConfig
-from .components import THEME_TEXT_SECONDARY, Color, Component, Row, Spacer, Text
+from .components import THEME_TEXT_SECONDARY, Color, Component
 
 if TYPE_CHECKING:
     from ..render_context import RenderContext
@@ -35,45 +36,36 @@ class ChartDisplay(Component):
         """Render chart with header, sparkline, and optional range."""
         font_label = ctx.get_font("small")
         padding = int(width * 0.08)
+        inner_w = width - padding * 2
 
-        # Calculate chart area
-        header_height = int(height * 0.15) if self.label else int(height * 0.08)
+        value_str = f"{self.current_value:.1f}{self.unit}" if self.current_value is not None else ""
+        mode = header_mode(ctx, label=self.label, value=value_str, inner_w=inner_w, height=height)
+        # Need text heights regardless of mode for header_height_for.
+        _, label_h = ctx.get_text_size("Hg", font_label) if self.label else (0, 0)
+        _, value_h = ctx.get_text_size("Hg", ctx.get_font("regular")) if value_str else (0, 0)
+        header_height = header_height_for(mode, label_h=label_h, value_h=value_h, height=height)
+
         is_binary = self._is_binary_data()
-        if self.show_range and not is_binary:
-            footer_height = int(height * 0.12)
-        else:
-            footer_height = int(height * 0.04)
+        # Hide min/max range labels when the cell is too small to fit them
+        # without overlapping the sparkline.
+        show_range = self.show_range and not is_binary and height >= 80
+        footer_height = int(height * 0.12) if show_range else int(height * 0.04)
         chart_top = y + header_height
         chart_bottom = y + height - footer_height
         chart_rect = (x + padding, chart_top, x + width - padding, chart_bottom)
 
-        # Build header using declarative components
-        header_children: list[Component] = []
-        if self.label:
-            header_children.append(
-                Text(
-                    text=self.label.upper(),
-                    font="small",
-                    color=THEME_TEXT_SECONDARY,
-                    align="start",
-                    truncate=True,  # Auto-truncate if needed
-                )
-            )
-        if self.current_value is not None:
-            value_str = f"{self.current_value:.1f}{self.unit}"
-            if self.label:
-                header_children.append(Spacer())
-            header_children.append(
-                Text(text=value_str, font="regular", color=self.color, align="end")
-            )
-
-        if header_children:
-            Row(
-                children=header_children,
-                gap=4,
-                padding=padding,
-                align="center",
-            ).render(ctx, x, y, width, header_height)
+        render_label_value_header(
+            ctx,
+            x,
+            y,
+            width,
+            header_height,
+            mode=mode,
+            label=self.label,
+            value=value_str,
+            value_color=self.color,
+            padding=padding,
+        )
 
         # Draw chart
         if len(self.data) >= 2:
@@ -84,7 +76,7 @@ class ChartDisplay(Component):
                     chart_rect, self.data, color=self.color, fill=self.fill, gradient=self.gradient
                 )
 
-                if self.show_range:
+                if show_range:
                     min_val = min(self.data)
                     max_val = max(self.data)
                     range_y = chart_bottom + int(height * 0.08)
