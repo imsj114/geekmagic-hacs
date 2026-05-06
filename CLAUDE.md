@@ -50,6 +50,33 @@ git commit -m "refactor: extract color parsing into helper function"
 git commit -m "chore: add ty type checker and pre-commit hooks"
 ```
 
+## Release Process
+
+HACS detects new versions via GitHub releases. The user creates releases in the GitHub UI (with auto-generated notes); Claude prepares the version bump.
+
+### When the user asks for a version bump (e.g. "bump to 1.0.1", "release a new patch")
+
+1. Determine the new version using semver:
+   - **Patch** (`1.0.0 → 1.0.1`): bug fixes only
+   - **Minor** (`1.0.0 → 1.1.0`): new features, backward-compatible
+   - **Major** (`1.0.0 → 2.0.0`): breaking changes
+2. Update `version` in `custom_components/geekmagic/manifest.json`
+3. Commit on `main` (or a `chore/bump-X.Y.Z` branch if a PR is preferred):
+   ```
+   chore: bump version to X.Y.Z
+   ```
+4. Push, then tell the user to create the release in GitHub UI:
+   - Releases → "Draft a new release"
+   - Tag: `vX.Y.Z` (matches `manifest.json`)
+   - Target: the bump commit on `main`
+   - Click "Generate release notes" → Publish
+
+### Critical rules
+- **Tag must match `manifest.json` version exactly** (HA core reads `manifest.json` and a mismatch breaks update detection)
+- **Tag the bump commit, not an earlier one** — otherwise the tagged tree still has the old version
+- Tag format: `vX.Y.Z` (with leading `v`)
+- Never tag or create the release yourself — the user does that in GitHub UI
+
 ## Project Structure
 
 ```
