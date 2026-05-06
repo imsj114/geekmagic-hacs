@@ -10,6 +10,9 @@ Example:
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, Literal
+
 from .components import (
     THEME_TEXT_PRIMARY,
     THEME_TEXT_SECONDARY,
@@ -26,59 +29,201 @@ from .components import (
     Spacer,
     Stack,
     Text,
+    VerticalBar,
 )
+
+if TYPE_CHECKING:
+    from ..render_context import RenderContext
 
 Color = tuple[int, int, int]
 
+BarGaugeMode = Literal["auto", "compact", "stacked", "vertical"]
 
-def BarGauge(
-    percent: float,
-    value: str,
-    label: str,
-    color: Color,
-    icon: str | None = None,
-    background: Color | None = None,  # None = theme tinted track
-    padding: int = 6,
-) -> Component:
-    """Bar gauge: caps-tracked label/icon row + thin tinted progress bar.
 
-    The header row puts the label on the left and the value on the right
-    (semibold, primary text color); the bar fills the row beneath.
+def _pick_bar_mode(width: int, height: int) -> BarGaugeMode:
+    """Auto-pick a BarGauge layout based on cell shape.
+
+    - vertical: tall+narrow cells (height > 1.4x width) → thermometer-style
+    - stacked:  square-ish + at least ~100x100 → label/value/bar hero layout
+    - compact:  everything else (wide+short, tiny grids)
     """
-    header_children: list[Component | None] = []
-    if icon:
-        header_children.append(Icon(icon, size=16, color=color))
-    # Use legacy fixed sizes (tiny/medium) so density doesn't blow up in
-    # large cells; auto_fit lets them shrink in narrow cells.
-    header_children.extend(
-        [
-            Text(
-                label.upper(),
-                font="tiny",
-                color=THEME_TEXT_SECONDARY,
-                truncate=True,
-                auto_fit=True,
-            ),
-            Spacer(),
-            Text(
-                value,
-                font="medium",
-                bold=True,
-                color=THEME_TEXT_PRIMARY,
-                auto_fit=True,
-            ),
-        ]
-    )
+    if height > width * 1.4:
+        return "vertical"
+    aspect = width / max(height, 1)
+    if 0.7 <= aspect <= 1.5 and min(width, height) >= 100:
+        return "stacked"
+    return "compact"
 
-    return Column(
-        gap=5,
-        padding=padding,
-        justify="center",
-        children=[
-            Adaptive(children=[c for c in header_children if c is not None], gap=6),
-            Bar(percent=percent, color=color, background=background),
-        ],
-    )
+
+@dataclass
+class BarGauge(Component):
+    """Adaptive bar gauge — picks `compact`, `stacked`, or `vertical` based
+    on cell shape, or honors an explicit mode override.
+
+    - `compact` (default for landscape cells): caps label + value pinned
+      to the top of the cell, thicker tinted bar pinned to the bottom
+      via `justify="space-between"`. Fills the cell height.
+    - `stacked` (auto on cells ≥100x100, square-ish): caps label centred
+      top, big bold tinted value centred middle (auto-fit), thick bar
+      bottom — Apple-Watch Modular-Large bar pattern.
+    - `vertical` (auto on tall+narrow cells): a `VerticalBar` on the
+      right ~35% of the cell, value+label stacked on the left.
+    """
+
+    percent: float
+    value: str
+    label: str
+    color: Color
+    icon: str | None = None
+    background: Color | None = None  # None = theme tinted track
+    padding: int = 6
+    mode: BarGaugeMode = "auto"
+
+    def measure(self, ctx: RenderContext, max_width: int, max_height: int) -> tuple[int, int]:
+        return (max_width, max_height)
+
+    def render(self, ctx: RenderContext, x: int, y: int, width: int, height: int) -> None:
+        chosen = self.mode if self.mode != "auto" else _pick_bar_mode(width, height)
+        if chosen == "stacked":
+            tree = self._build_stacked()
+        elif chosen == "vertical":
+            tree = self._build_vertical()
+        else:
+            tree = self._build_compact()
+        tree.render(ctx, x, y, width, height)
+
+    # ---- mode builders ----
+
+    def _build_compact(self) -> Component:
+        """Header row pinned to top (icon + caps label + value); thicker
+        tinted bar pinned to bottom. Uses justify=space-between so the
+        cell fills regardless of natural content height.
+        """
+        header_children: list[Component | None] = []
+        if self.icon:
+            header_children.append(Icon(self.icon, size=16, color=self.color))
+        header_children.extend(
+            [
+                Text(
+                    self.label.upper(),
+                    font="tiny",
+                    color=THEME_TEXT_SECONDARY,
+                    truncate=True,
+                    auto_fit=True,
+                ),
+                Spacer(),
+                Text(
+                    self.value,
+                    font="medium",
+                    bold=True,
+                    color=THEME_TEXT_PRIMARY,
+                    auto_fit=True,
+                ),
+            ]
+        )
+
+        return Column(
+            gap=5,
+            padding=self.padding,
+            align="stretch",
+            justify="space-between",
+            children=[
+                Adaptive(children=[c for c in header_children if c is not None], gap=6),
+                Bar(percent=self.percent, color=self.color, background=self.background),
+            ],
+        )
+
+    def _build_stacked(self) -> Component:
+        """Modular-Large pattern: caps label top, hero value middle (bold,
+        tinted, auto-fit), thick bar at the bottom — three clear bands.
+        """
+        # Bar component natural height is ~15% of available space — that
+        # under-represents what feels right in a hero cell. Pass an
+        # explicit height so the bar reads as substantial.
+        bar = Bar(
+            percent=self.percent,
+            color=self.color,
+            background=self.background,
+        )
+        return Column(
+            gap=4,
+            padding=self.padding,
+            align="stretch",
+            justify="space-between",
+            children=[
+                Row(
+                    children=[
+                        Text(
+                            self.label.upper(),
+                            font="tiny",
+                            color=THEME_TEXT_SECONDARY,
+                            truncate=True,
+                        )
+                    ],
+                    justify="center",
+                    align="center",
+                ),
+                Row(
+                    children=[
+                        Text(
+                            self.value,
+                            font="huge",
+                            bold=True,
+                            color=self.color,
+                            auto_fit=True,
+                        )
+                    ],
+                    justify="center",
+                    align="center",
+                ),
+                bar,
+            ],
+        )
+
+    def _build_vertical(self) -> Component:
+        """Tall+narrow cells: VerticalBar on the right, value+label on the
+        left. Reads like a thermometer / level meter.
+        """
+        left = Column(
+            gap=2,
+            padding=2,
+            align="center",
+            justify="center",
+            children=[
+                Text(
+                    self.value,
+                    font="medium",
+                    bold=True,
+                    color=self.color,
+                    auto_fit=True,
+                ),
+                Text(
+                    self.label.upper(),
+                    font="tiny",
+                    color=THEME_TEXT_SECONDARY,
+                    truncate=True,
+                    auto_fit=True,
+                ),
+            ],
+        )
+        return Row(
+            gap=8,
+            padding=self.padding,
+            align="stretch",
+            justify="start",
+            children=[
+                # Flex(left) — but we don't import Flex here; instead use a
+                # column wrapper that takes its measured width and let the
+                # Row hand the remainder to the bar. The trailing
+                # VerticalBar measures its own width.
+                left,
+                VerticalBar(
+                    percent=self.percent,
+                    color=self.color,
+                    background=self.background,
+                ),
+            ],
+        )
 
 
 def RingGauge(

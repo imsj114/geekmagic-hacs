@@ -307,6 +307,49 @@ class Bar(Component):
 
 
 @dataclass
+class VerticalBar(Component):
+    """Vertical progress bar — fills upward from the bottom.
+
+    Mirror of `Bar` on the vertical axis. Useful for tall, narrow cells
+    (1x2, 1x3, sidebar slots) where a horizontal bar looks orphaned. The
+    track picks up the theme's tinted-track style via `ctx.track_color`,
+    matching the rest of the gauge family.
+    """
+
+    percent: float
+    color: Color = (0, 255, 255)
+    background: Color | None = None  # None = theme tinted track
+    width: int | None = None  # None = sensible default relative to container
+
+    def measure(self, ctx: RenderContext, max_width: int, max_height: int) -> tuple[int, int]:
+        # Default thickness: ~22% of available width, capped at 24px so it
+        # doesn't dominate small cells. Symmetric to Bar's default height.
+        w = self.width or max(8, min(24, int(max_width * 0.22)))
+        return (w, max_height)
+
+    def render(self, ctx: RenderContext, x: int, y: int, width: int, height: int) -> None:
+        bg_raw = self.background if self.background is not None else ctx.track_color(self.color)
+        # Resolve sentinels — Bar is constructed with a sentinel-aware color
+        # passed by widgets; VerticalBar should match that contract.
+        fill_color = _resolve_color(self.color, ctx)
+        bg_color = _resolve_color(bg_raw, ctx)
+
+        # Round the corners proportional to width — same look as horizontal Bar.
+        radius = max(2, width // 2)
+        # Track fills the full height.
+        ctx.draw_rounded_rect((x, y, x + width, y + height), radius=radius, fill=bg_color)
+        # Fill rises from the bottom by `percent` of the available height.
+        pct = max(0.0, min(100.0, self.percent))
+        fill_h = int(height * pct / 100)
+        if fill_h > 0:
+            ctx.draw_rounded_rect(
+                (x, y + height - fill_h, x + width, y + height),
+                radius=radius,
+                fill=fill_color,
+            )
+
+
+@dataclass
 class Ring(Component):
     """Circular ring gauge component (Apple Activity-ring style).
 
@@ -1149,8 +1192,16 @@ class IconValueDisplay(Component):
 # ============================================================================
 
 __all__ = [
+    "THEME_ERROR",
+    "THEME_INFO",
+    "THEME_MUTED",
+    "THEME_PRIMARY",
+    "THEME_SECONDARY",
+    "THEME_SUCCESS",
     "THEME_TEXT_PRIMARY",
     "THEME_TEXT_SECONDARY",
+    "THEME_TEXT_TERTIARY",
+    "THEME_WARNING",
     "Adaptive",
     "Align",
     "Arc",
@@ -1176,4 +1227,5 @@ __all__ = [
     "Sparkline",
     "Stack",
     "Text",
+    "VerticalBar",
 ]
