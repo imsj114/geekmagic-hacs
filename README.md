@@ -33,24 +33,24 @@ Special thanks to:
 ## Dashboard Samples
 
 <p align="center">
-  <img src="samples/01_system_monitor.png" alt="System Monitor" width="120">
-  <img src="samples/02_smart_home.png" alt="Smart Home" width="120">
-  <img src="samples/03_weather.png" alt="Weather" width="120">
-  <img src="samples/04_server_stats.png" alt="Server Stats" width="120">
+  <img src="samples/01_system_monitor.png" alt="System Monitor" width="200">
+  <img src="samples/02_smart_home.png" alt="Smart Home" width="200">
+  <img src="samples/03_weather.png" alt="Weather" width="200">
+  <img src="samples/04_server_stats.png" alt="Server Stats" width="200">
 </p>
 
 <p align="center">
-  <img src="samples/05_media_player.png" alt="Media Player" width="120">
-  <img src="samples/06_energy_monitor.png" alt="Energy Monitor" width="120">
-  <img src="samples/07_fitness.png" alt="Fitness Tracker" width="120">
-  <img src="samples/08_clock_dashboard.png" alt="Clock Dashboard" width="120">
+  <img src="samples/05_media_player.png" alt="Media Player" width="200">
+  <img src="samples/06_energy_monitor.png" alt="Energy Monitor" width="200">
+  <img src="samples/07_fitness.png" alt="Fitness Tracker" width="200">
+  <img src="samples/08_clock_dashboard.png" alt="Clock Dashboard" width="200">
 </p>
 
 <p align="center">
-  <img src="samples/09_network_monitor.png" alt="Network Monitor" width="120">
-  <img src="samples/10_thermostat.png" alt="Thermostat" width="120">
-  <img src="samples/11_batteries.png" alt="Batteries" width="120">
-  <img src="samples/12_security.png" alt="Security" width="120">
+  <img src="samples/09_network_monitor.png" alt="Network Monitor" width="200">
+  <img src="samples/10_thermostat.png" alt="Thermostat" width="200">
+  <img src="samples/11_batteries.png" alt="Batteries" width="200">
+  <img src="samples/12_security.png" alt="Security" width="200">
 </p>
 
 ## Binary Sensor States & Icons
