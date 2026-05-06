@@ -46,11 +46,14 @@ BarGaugeMode = Literal["auto", "compact", "stacked", "vertical"]
 def _pick_bar_mode(width: int, height: int) -> BarGaugeMode:
     """Auto-pick a BarGauge layout based on cell shape.
 
-    - vertical: tall+narrow cells (height > 1.4x width) → thermometer-style
+    - vertical: genuinely tall+narrow cells (height > 1.8x width). The
+      threshold is intentionally generous (1.8 not 1.4) — at lower
+      ratios the vertical bar reads as a chunky block rather than a
+      thermometer, and a horizontal compact bar fills the cell better.
     - stacked:  square-ish + at least ~100x100 → label/value/bar hero layout
     - compact:  everything else (wide+short, tiny grids)
     """
-    if height > width * 1.4:
+    if height > width * 1.8:
         return "vertical"
     aspect = width / max(height, 1)
     if 0.7 <= aspect <= 1.5 and min(width, height) >= 100:

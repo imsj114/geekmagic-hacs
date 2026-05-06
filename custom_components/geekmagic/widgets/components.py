@@ -1162,8 +1162,15 @@ class IconValueDisplay(Component):
         value_color = _resolve_color(self.value_color, ctx)
         label_color = _resolve_color(self.label_color, ctx)
 
-        # Calculate sizes based on container
-        icon_size = self.icon_size or max(16, min(48, int(inner_height * 0.25)))
+        # Calculate sizes based on container. Scale icon by the smaller
+        # dimension so a tall narrow cell (e.g. 70x240 sidebar slot)
+        # doesn't get a 48-px icon that dominates the 70-px width — pick
+        # min(width, height) as the reference and stay under ~40% of
+        # the cell width either way.
+        scale_dim = min(inner_width, inner_height)
+        icon_size = self.icon_size or max(
+            16, min(48, int(scale_dim * 0.30), int(inner_width * 0.40))
+        )
         label_height = int(inner_height * 0.15)
         value_height = inner_height - icon_size - label_height - 12  # gaps
 

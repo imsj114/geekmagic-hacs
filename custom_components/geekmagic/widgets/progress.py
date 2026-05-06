@@ -117,7 +117,13 @@ class ProgressDisplay(Component):
         label_text = self.label.upper()
 
         if is_expanded:
-            # Expanded: icon + label on top, value below, bar + percent at bottom
+            # Expanded watchOS-style hierarchy:
+            #   Row 1: caps label (caption tier)
+            #   Row 2: HERO percentage (big, bold, white) — short and
+            #          glanceable. The verbose '8.5k/10k steps' detail
+            #          would auto-fit-shrink to a tiny font in 2x2 cells;
+            #          using "85%" keeps the hero substantial.
+            #   Row 3: bar + value/target detail
             icon_size = max(16, int(height * 0.18))
 
             # Row 1: Icon + Label (centered)
@@ -134,17 +140,16 @@ class ProgressDisplay(Component):
                 )
             )
 
-            # Row 2: Hero value — bold, tinted with the bar's color, auto-fit
-            # to fill the row. Uses font="huge" so the auto-fit has plenty of
-            # head-room and the value reads as the dominant element of the
-            # cell (the watchOS-style hierarchy: caption / hero / bar).
+            # Row 2: hero percentage — white per design rule (the bar
+            # carries the colour). Auto-fit so it scales gracefully from
+            # tight 2x2 cells (110px) to fullscreen.
             value_row = Row(
                 children=[
                     Text(
-                        text=value_text,
+                        text=f"{percent:.0f}%",
                         font="huge",
                         bold=True,
-                        color=self.color,
+                        color=THEME_TEXT_PRIMARY,
                         align="center",
                         auto_fit=True,
                     )
@@ -153,7 +158,8 @@ class ProgressDisplay(Component):
                 padding=padding,
             )
 
-            # Row 3: Bar + Percent
+            # Row 3: bar + value/target detail (e.g. "8.5k/10k steps").
+            # Detail is the secondary info to the hero %.
             bar_row = Row(
                 children=[
                     Flex(
@@ -164,7 +170,11 @@ class ProgressDisplay(Component):
                         )
                     ),
                     Text(
-                        text=f"{percent:.0f}%", font="small", color=THEME_TEXT_PRIMARY, align="end"
+                        text=value_text,
+                        font="small",
+                        color=THEME_TEXT_SECONDARY,
+                        align="end",
+                        auto_fit=True,
                     ),
                 ],
                 gap=8,
