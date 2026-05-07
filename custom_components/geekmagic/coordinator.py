@@ -20,10 +20,6 @@ from homeassistant.util import dt as dt_util
 
 from .const import (
     BACKOFF_LOG_INTERVAL,
-    COLOR_CYAN,
-    COLOR_GRAY,
-    COLOR_LIME,
-    COLOR_WHITE,
     CONF_DISPLAY_ROTATION,
     CONF_JPEG_QUALITY,
     CONF_LAYOUT,
@@ -374,64 +370,37 @@ class GeekMagicCoordinator(DataUpdateCoordinator):
         """
         layout = HeroLayout(footer_slots=3, hero_ratio=0.65, padding=8, gap=8)
 
-        # Hero: Clock widget showing current time
+        # Hero: Clock widget showing current time. No explicit color — the
+        # widget defaults to theme.text_primary so the welcome screen reads
+        # correctly under light themes too.
         clock = ClockWidget(
             WidgetConfig(
                 widget_type="clock",
                 slot=0,
-                color=COLOR_WHITE,
                 options={"show_date": True, "show_seconds": False},
             )
         )
         layout.set_widget(0, clock)
 
-        # Footer slot 1: HA version
-        ha_version = TextWidget(
-            WidgetConfig(
-                widget_type="text",
-                slot=1,
-                label="HA",
-                color=COLOR_CYAN,
-                options={
-                    "text": self._get_ha_version(),
-                    "size": "small",
-                    "align": "center",
-                },
+        # Footer: HA version, entity count, setup hint — uniform
+        # text_primary values under text_secondary captions, in the
+        # watchOS three-band style.
+        for slot, label, text in (
+            (1, "HA", self._get_ha_version()),
+            (2, "Entities", str(self._get_entity_count())),
+            (3, "Setup", "Ready"),
+        ):
+            layout.set_widget(
+                slot,
+                TextWidget(
+                    WidgetConfig(
+                        widget_type="text",
+                        slot=slot,
+                        label=label,
+                        options={"text": text, "size": "small", "align": "center"},
+                    )
+                ),
             )
-        )
-        layout.set_widget(1, ha_version)
-
-        # Footer slot 2: Entity count
-        entity_count = TextWidget(
-            WidgetConfig(
-                widget_type="text",
-                slot=2,
-                label="Entities",
-                color=COLOR_LIME,
-                options={
-                    "text": str(self._get_entity_count()),
-                    "size": "small",
-                    "align": "center",
-                },
-            )
-        )
-        layout.set_widget(2, entity_count)
-
-        # Footer slot 3: Setup hint
-        setup_hint = TextWidget(
-            WidgetConfig(
-                widget_type="text",
-                slot=3,
-                label="Setup",
-                color=COLOR_GRAY,
-                options={
-                    "text": "Ready",
-                    "size": "small",
-                    "align": "center",
-                },
-            )
-        )
-        layout.set_widget(3, setup_hint)
 
         return layout
 
@@ -807,13 +776,14 @@ class GeekMagicCoordinator(DataUpdateCoordinator):
                 )
 
             if not hero_widget:
-                # Default to Icon
+                # Default to Icon — IconWidget falls back to the active
+                # theme's accent color (matches whatever theme the user
+                # picked for the notification).
                 icon = data.get("icon", "mdi:bell-ring")
                 hero_widget = IconWidget(
                     WidgetConfig(
                         widget_type="icon",
                         slot=0,
-                        color=COLOR_CYAN,
                         options={
                             "icon": icon,
                             "size": "huge",  # This option is now supported by IconWidget
@@ -842,13 +812,12 @@ class GeekMagicCoordinator(DataUpdateCoordinator):
             )
 
         if not hero_widget:
-            # Default to Icon
+            # Default to Icon — falls back to the active theme's accent color.
             icon = data.get("icon", "mdi:bell-ring")
             hero_widget = IconWidget(
                 WidgetConfig(
                     widget_type="icon",
                     slot=0,
-                    color=COLOR_CYAN,
                     options={
                         "icon": icon,
                         "size": "huge",  # Force huge icon
@@ -857,12 +826,11 @@ class GeekMagicCoordinator(DataUpdateCoordinator):
             )
         layout.set_widget(0, hero_widget)
 
-        # Slot 1 (Footer): Message only (Title removed per request)
+        # Slot 1 (Footer): Message — defaults to theme.text_primary.
         text_widget = TextWidget(
             WidgetConfig(
                 widget_type="text",
                 slot=1,
-                color=COLOR_WHITE,
                 options={
                     "text": message,
                     "size": "medium",
