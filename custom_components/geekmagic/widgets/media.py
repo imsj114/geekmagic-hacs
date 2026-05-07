@@ -300,7 +300,7 @@ class NowPlaying(Component):
         album = self.album[: max_chars - 2] + ".." if len(self.album) > max_chars else self.album
 
         # Build component tree
-        children = [
+        children: list[Component] = [
             Text("NOW PLAYING", font="small", color=THEME_TEXT_SECONDARY),
             Spacer(min_size=int(height * 0.03)),
             Text(title, font="regular", color=THEME_TEXT_PRIMARY),

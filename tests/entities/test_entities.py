@@ -46,12 +46,13 @@ class TestDisplaySelectCoordinatorUpdate:
         from custom_components.geekmagic.entities.select import GeekMagicDisplaySelect
 
         select = GeekMagicDisplaySelect(mock_coordinator)
-        select.async_write_ha_state = MagicMock()
+        write_state = MagicMock()
+        object.__setattr__(select, "async_write_ha_state", write_state)
 
         # First update - should write state
         select._handle_coordinator_update()
 
-        select.async_write_ha_state.assert_called_once()
+        write_state.assert_called_once()
         assert select._last_options is not None
 
     def test_state_written_when_options_change(self, mock_coordinator):
@@ -61,11 +62,13 @@ class TestDisplaySelectCoordinatorUpdate:
         )
 
         select = GeekMagicDisplaySelect(mock_coordinator)
-        select.async_write_ha_state = MagicMock()
+        write_state = MagicMock()
+        object.__setattr__(select, "async_write_ha_state", write_state)
 
         # First update - sets initial options
         select._handle_coordinator_update()
-        initial_call_count = select.async_write_ha_state.call_count
+        initial_call_count = write_state.call_count
+        assert select._last_options is not None
         initial_options = select._last_options.copy()
 
         # Simulate adding a new view by mocking get_store
@@ -77,7 +80,7 @@ class TestDisplaySelectCoordinatorUpdate:
         # Second update with different options - should write state
         select._handle_coordinator_update()
 
-        assert select.async_write_ha_state.call_count == initial_call_count + 1
+        assert write_state.call_count == initial_call_count + 1
         assert select._last_options != initial_options
 
     def test_state_not_written_during_cycling(self, mock_coordinator):
@@ -85,11 +88,12 @@ class TestDisplaySelectCoordinatorUpdate:
         from custom_components.geekmagic.entities.select import GeekMagicDisplaySelect
 
         select = GeekMagicDisplaySelect(mock_coordinator)
-        select.async_write_ha_state = MagicMock()
+        write_state = MagicMock()
+        object.__setattr__(select, "async_write_ha_state", write_state)
 
         # First update
         select._handle_coordinator_update()
-        initial_call_count = select.async_write_ha_state.call_count
+        initial_call_count = write_state.call_count
 
         # Simulate cycling - current_screen changes but options stay the same
         mock_coordinator.current_screen = 1
@@ -98,18 +102,19 @@ class TestDisplaySelectCoordinatorUpdate:
         select._handle_coordinator_update()
 
         # Call count should not have increased
-        assert select.async_write_ha_state.call_count == initial_call_count
+        assert write_state.call_count == initial_call_count
 
     def test_state_not_written_on_multiple_cycling_updates(self, mock_coordinator):
         """Test that repeated cycling updates don't trigger state writes."""
         from custom_components.geekmagic.entities.select import GeekMagicDisplaySelect
 
         select = GeekMagicDisplaySelect(mock_coordinator)
-        select.async_write_ha_state = MagicMock()
+        write_state = MagicMock()
+        object.__setattr__(select, "async_write_ha_state", write_state)
 
         # First update
         select._handle_coordinator_update()
-        initial_call_count = select.async_write_ha_state.call_count
+        initial_call_count = write_state.call_count
 
         # Simulate multiple cycling updates
         for i in range(10):
@@ -117,7 +122,7 @@ class TestDisplaySelectCoordinatorUpdate:
             select._handle_coordinator_update()
 
         # Call count should not have increased despite 10 updates
-        assert select.async_write_ha_state.call_count == initial_call_count
+        assert write_state.call_count == initial_call_count
 
     @pytest.mark.asyncio
     async def test_state_written_after_user_selection(self, mock_coordinator, mock_hass):
@@ -126,13 +131,14 @@ class TestDisplaySelectCoordinatorUpdate:
 
         select = GeekMagicDisplaySelect(mock_coordinator)
         select.hass = mock_hass
-        select.async_write_ha_state = MagicMock()
+        write_state = MagicMock()
+        object.__setattr__(select, "async_write_ha_state", write_state)
 
         # User selects a built-in mode
         await select.async_select_option("Weather Clock Today")
 
         # State should be written after user selection
-        select.async_write_ha_state.assert_called()
+        write_state.assert_called()
 
     @pytest.mark.asyncio
     async def test_state_written_after_custom_view_selection(self, mock_coordinator, mock_hass):
@@ -147,13 +153,14 @@ class TestDisplaySelectCoordinatorUpdate:
 
         select = GeekMagicDisplaySelect(mock_coordinator)
         select.hass = mock_hass
-        select.async_write_ha_state = MagicMock()
+        write_state = MagicMock()
+        object.__setattr__(select, "async_write_ha_state", write_state)
 
         # User selects the custom view
         await select.async_select_option("My Dashboard")
 
         # State should be written
-        select.async_write_ha_state.assert_called()
+        write_state.assert_called()
 
 
 class TestViewCyclingSwitchIsOn:

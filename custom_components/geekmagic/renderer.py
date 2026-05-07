@@ -25,6 +25,8 @@ from .const import (
 from .icons import get_mdi_char
 
 if TYPE_CHECKING:
+    from collections.abc import Sequence
+
     from PIL.ImageFont import FreeTypeFont
 
 
@@ -552,7 +554,7 @@ class Renderer:
         self,
         draw: ImageDraw.ImageDraw,
         rect: tuple[int, int, int, int],
-        data: list[float],
+        data: Sequence[float],
         color: tuple[int, int, int] = COLOR_CYAN,
         fill: bool = True,
         smooth: bool = True,
@@ -633,6 +635,18 @@ class Renderer:
         # Draw line
         if len(int_points) >= 2:
             draw.line(int_points, fill=color, width=self._s(2))
+
+    def dim_color(
+        self,
+        color: tuple[int, int, int],
+        factor: float = 0.25,
+    ) -> tuple[int, int, int]:
+        """Return a dimmed version of a color for legacy debug render scripts."""
+        return (
+            max(0, min(255, int(color[0] * factor))),
+            max(0, min(255, int(color[1] * factor))),
+            max(0, min(255, int(color[2] * factor))),
+        )
 
     def draw_timeline_bar(
         self,

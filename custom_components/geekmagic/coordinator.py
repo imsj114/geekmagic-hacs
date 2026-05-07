@@ -1685,8 +1685,9 @@ class GeekMagicCoordinator(DataUpdateCoordinator):
                     return_response=True,
                 )
 
-                if response and entity_id in response:
-                    forecast = response[entity_id].get("forecast", [])
+                forecast_response = response.get(entity_id) if isinstance(response, dict) else None
+                if isinstance(forecast_response, dict):
+                    forecast = forecast_response.get("forecast", [])
                     self._weather_forecasts[entity_id] = forecast
                     _LOGGER.debug(
                         "Fetched %d forecast days for %s",

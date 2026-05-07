@@ -92,14 +92,22 @@ class GaugeWidget(Widget):
             return None
 
         sorted_thresholds = sorted(self.color_thresholds, key=lambda t: t.get("value", 0))
-        matching_color = None
+        matching_color: tuple[int, int, int] | None = None
         for threshold in sorted_thresholds:
             threshold_value = threshold.get("value", 0)
             threshold_color = threshold.get("color")
-            if value >= threshold_value and threshold_color:
-                matching_color = tuple(threshold_color)
+            if (
+                value >= threshold_value
+                and isinstance(threshold_color, list | tuple)
+                and len(threshold_color) == 3
+            ):
+                matching_color = (
+                    int(threshold_color[0]),
+                    int(threshold_color[1]),
+                    int(threshold_color[2]),
+                )
 
-        return matching_color  # type: ignore[return-value]
+        return matching_color
 
     def render(self, ctx: RenderContext, state: WidgetState) -> Component:
         """Render the gauge widget.

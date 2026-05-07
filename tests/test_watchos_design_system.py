@@ -23,6 +23,10 @@ from custom_components.geekmagic import const
 from custom_components.geekmagic.layouts.grid import Grid2x2
 from custom_components.geekmagic.render_context import RenderContext
 from custom_components.geekmagic.renderer import Renderer
+from custom_components.geekmagic.widgets.colors import (
+    THEME_COLOR_SENTINELS,
+    resolve_theme_color,
+)
 from custom_components.geekmagic.widgets.components import (
     THEME_ERROR,
     THEME_INFO,
@@ -152,26 +156,28 @@ class TestThemeColorSentinels:
     def test_each_sentinel_resolves_per_theme(self) -> None:
         """Every (sentinel, theme) pair maps to the theme's role attribute.
 
-        Tests the components-side helper. Renders against every theme so
+        Tests the shared color-role helper. Renders against every theme so
         adding a new theme can't silently break role resolution.
         """
         for theme_name, theme in THEMES.items():
-            ctx = MagicMock()
-            ctx.theme = theme
             for sentinel, attr in _SENTINEL_TO_ATTR.items():
-                resolved = _resolve_color(sentinel, ctx)
+                resolved = resolve_theme_color(sentinel, theme)
                 expected = getattr(theme, attr)
                 assert resolved == expected, (
                     f"theme={theme_name} sentinel={sentinel} "
                     f"resolved={resolved} expected={expected}"
                 )
 
-    def test_render_context_resolves_sentinels(self) -> None:
-        """The mirrored resolver in RenderContext also maps every sentinel.
+    def test_components_use_shared_resolver(self) -> None:
+        """The public components helper delegates to the shared resolver."""
+        ctx = MagicMock()
+        ctx.theme = THEME_WATCHOS
+        assert _resolve_color(THEME_WARNING, ctx) == resolve_theme_color(
+            THEME_WARNING, THEME_WATCHOS
+        )
 
-        Both copies of the table need to agree — drift between them is the
-        kind of bug that's invisible until a widget calls draw_text directly.
-        """
+    def test_render_context_resolves_sentinels(self) -> None:
+        """RenderContext draw helpers use the shared sentinel resolver."""
         renderer = Renderer()
         _img, draw = renderer.create_canvas()
         for theme_name, theme in THEMES.items():
@@ -183,6 +189,69 @@ class TestThemeColorSentinels:
                     f"theme={theme_name} sentinel={sentinel} "
                     f"resolved={resolved} expected={expected}"
                 )
+
+    def test_sentinel_contract_matches_test_matrix(self) -> None:
+        """The regression matrix covers every registered color sentinel."""
+        assert THEME_COLOR_SENTINELS == _SENTINEL_TO_ATTR
+
+    def test_render_context_resolves_primitive_drawing_colors(
+        self, render_ctx: RenderContext, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Low-level draw helpers resolve sentinels before hitting Renderer."""
+        captured: dict[str, tuple[int, int, int] | None] = {}
+
+        def draw_rect(_draw, _rect, *, fill=None, outline=None, width=1):
+            captured["rect_fill"] = fill
+            captured["rect_outline"] = outline
+
+        def draw_rounded_rect(_draw, _rect, *, radius=4, fill=None, outline=None, width=1):
+            captured["rounded_fill"] = fill
+            captured["rounded_outline"] = outline
+
+        def draw_panel(_draw, _rect, *, background, border_color=None, radius=4):
+            captured["panel_background"] = background
+            captured["panel_border"] = border_color
+
+        def draw_timeline_bar(_draw, _rect, _data, *, on_color, off_color):
+            captured["timeline_on"] = on_color
+            captured["timeline_off"] = off_color
+
+        def draw_ellipse(_draw, _rect, *, fill=None, outline=None, width=1):
+            captured["ellipse_fill"] = fill
+            captured["ellipse_outline"] = outline
+
+        def draw_line(_draw, _xy, *, fill=None, width=1):
+            captured["line_fill"] = fill
+
+        monkeypatch.setattr(render_ctx._renderer, "draw_rect", draw_rect)
+        monkeypatch.setattr(render_ctx._renderer, "draw_rounded_rect", draw_rounded_rect)
+        monkeypatch.setattr(render_ctx._renderer, "draw_panel", draw_panel)
+        monkeypatch.setattr(render_ctx._renderer, "draw_timeline_bar", draw_timeline_bar)
+        monkeypatch.setattr(render_ctx._renderer, "draw_ellipse", draw_ellipse)
+        monkeypatch.setattr(render_ctx._renderer, "draw_line", draw_line)
+
+        render_ctx.draw_rect((0, 0, 1, 1), fill=THEME_PRIMARY, outline=THEME_WARNING)
+        render_ctx.draw_rounded_rect((0, 0, 1, 1), fill=THEME_SUCCESS, outline=THEME_ERROR)
+        render_ctx.draw_panel((0, 0, 1, 1), background=THEME_MUTED, border_color=THEME_INFO)
+        render_ctx.draw_timeline_bar(
+            (0, 0, 10, 2), [0.0, 1.0], on_color=THEME_SUCCESS, off_color=THEME_ERROR
+        )
+        render_ctx.draw_ellipse((0, 0, 1, 1), fill=THEME_SECONDARY, outline=THEME_PRIMARY)
+        render_ctx.draw_line([(0, 0), (1, 1)], fill=THEME_TEXT_TERTIARY)
+
+        assert captured == {
+            "rect_fill": THEME_WATCHOS.primary,
+            "rect_outline": THEME_WATCHOS.warning,
+            "rounded_fill": THEME_WATCHOS.success,
+            "rounded_outline": THEME_WATCHOS.error,
+            "panel_background": THEME_WATCHOS.muted,
+            "panel_border": THEME_WATCHOS.info,
+            "timeline_on": THEME_WATCHOS.success,
+            "timeline_off": THEME_WATCHOS.error,
+            "ellipse_fill": THEME_WATCHOS.secondary,
+            "ellipse_outline": THEME_WATCHOS.primary,
+            "line_fill": THEME_WATCHOS.text_tertiary,
+        }
 
     def test_concrete_color_passes_through_unchanged(self) -> None:
         """Non-sentinel RGB values must round-trip untouched."""

@@ -1,6 +1,7 @@
 """Tests for timezone handling in preview rendering."""
 
 from datetime import datetime
+from typing import Any
 from unittest.mock import MagicMock
 from zoneinfo import ZoneInfo
 
@@ -16,7 +17,7 @@ class TestPreviewTimezone:
         now = datetime.now(tz=base_tz)
 
         # Test clock widget with timezone override
-        widget_data = {
+        widget_data: dict[str, Any] = {
             "type": "clock",
             "slot": 0,
             "options": {"timezone": "America/New_York"},
@@ -39,7 +40,7 @@ class TestPreviewTimezone:
         base_tz = ZoneInfo("Europe/Paris")
         now = datetime.now(tz=base_tz)
 
-        widget_data = {
+        widget_data: dict[str, Any] = {
             "type": "clock",
             "slot": 0,
             "options": {"timezone": ""},
@@ -61,7 +62,7 @@ class TestPreviewTimezone:
         base_tz = ZoneInfo("Europe/Paris")
         now = datetime.now(tz=base_tz)
 
-        widget_data = {
+        widget_data: dict[str, Any] = {
             "type": "entity",  # Not a clock widget
             "slot": 0,
             "options": {"timezone": "America/New_York"},
@@ -84,7 +85,7 @@ class TestPreviewTimezone:
         base_tz = ZoneInfo("Europe/Paris")
         now = datetime.now(tz=base_tz)
 
-        widget_data = {
+        widget_data: dict[str, Any] = {
             "type": "clock",
             "slot": 0,
             "options": {"timezone": "Invalid/Timezone"},

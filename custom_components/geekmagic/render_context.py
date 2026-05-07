@@ -58,6 +58,8 @@ def get_size_category(height: int) -> SizeCategory:
 
 
 if TYPE_CHECKING:
+    from collections.abc import Sequence
+
     from PIL import Image, ImageDraw
     from PIL.ImageFont import FreeTypeFont, ImageFont
 
@@ -184,17 +186,12 @@ class RenderContext:
         """Resolve theme-aware color sentinels to actual colors.
 
         Widgets construct components with sentinel values like THEME_PRIMARY
-        or THEME_WARNING (negative-channel tuples — see widgets.components).
-        This method swaps them for the active theme's colors at draw time.
-        Lazy import of the sentinel table avoids a circular import.
+        or THEME_WARNING (negative-channel tuples — see widgets.colors). This
+        method swaps them for the active theme's colors at draw time.
         """
-        if color[0] < 0:
-            from .widgets.components import _THEME_COLOR_SENTINELS
+        from .widgets.colors import resolve_theme_color
 
-            attr = _THEME_COLOR_SENTINELS.get(color)
-            if attr is not None:
-                return getattr(self.theme, attr)
-        return color
+        return resolve_theme_color(color, self.theme)
 
     def _abs_point(self, x: int, y: int) -> tuple[int, int]:
         """Convert local point to absolute canvas coordinates."""
@@ -341,7 +338,13 @@ class RenderContext:
             width: Outline width
         """
         abs_rect = self._abs_rect(rect)
-        self._renderer.draw_rect(self._draw, abs_rect, fill=fill, outline=outline, width=width)
+        self._renderer.draw_rect(
+            self._draw,
+            abs_rect,
+            fill=self._resolve_color(fill) if fill is not None else None,
+            outline=self._resolve_color(outline) if outline is not None else None,
+            width=width,
+        )
 
     def draw_rounded_rect(
         self,
@@ -362,7 +365,12 @@ class RenderContext:
         """
         abs_rect = self._abs_rect(rect)
         self._renderer.draw_rounded_rect(
-            self._draw, abs_rect, radius=radius, fill=fill, outline=outline, width=width
+            self._draw,
+            abs_rect,
+            radius=radius,
+            fill=self._resolve_color(fill) if fill is not None else None,
+            outline=self._resolve_color(outline) if outline is not None else None,
+            width=width,
         )
 
     def draw_panel(
@@ -382,7 +390,11 @@ class RenderContext:
         """
         abs_rect = self._abs_rect(rect)
         self._renderer.draw_panel(
-            self._draw, abs_rect, background=background, border_color=border_color, radius=radius
+            self._draw,
+            abs_rect,
+            background=self._resolve_color(background),
+            border_color=self._resolve_color(border_color) if border_color is not None else None,
+            radius=radius,
         )
 
     def draw_bar(
@@ -469,7 +481,7 @@ class RenderContext:
     def draw_sparkline(
         self,
         rect: tuple[int, int, int, int],
-        data: list[float],
+        data: Sequence[float],
         color: tuple[int, int, int],
         fill: bool = True,
         smooth: bool = True,
@@ -529,8 +541,8 @@ class RenderContext:
             self._draw,
             abs_rect,
             data,
-            on_color=on_color,
-            off_color=off_color or COLOR_GRAY,
+            on_color=self._resolve_color(on_color),
+            off_color=self._resolve_color(off_color or COLOR_GRAY),
         )
 
     def draw_ellipse(
@@ -549,7 +561,13 @@ class RenderContext:
             width: Outline width
         """
         abs_rect = self._abs_rect(rect)
-        self._renderer.draw_ellipse(self._draw, abs_rect, fill=fill, outline=outline, width=width)
+        self._renderer.draw_ellipse(
+            self._draw,
+            abs_rect,
+            fill=self._resolve_color(fill) if fill is not None else None,
+            outline=self._resolve_color(outline) if outline is not None else None,
+            width=width,
+        )
 
     def draw_icon(
         self,
@@ -584,7 +602,12 @@ class RenderContext:
             width: Line width
         """
         abs_xy = [self._abs_point(*p) for p in xy]
-        self._renderer.draw_line(self._draw, abs_xy, fill=fill, width=width)
+        self._renderer.draw_line(
+            self._draw,
+            abs_xy,
+            fill=self._resolve_color(fill) if fill is not None else None,
+            width=width,
+        )
 
     def draw_gradient_fade(
         self,
@@ -606,7 +629,7 @@ class RenderContext:
 
     def draw_image(
         self,
-        source: Image.Image,  # type: ignore[name-defined]
+        source: Image.Image,
         rect: tuple[int, int, int, int] | None = None,
         preserve_aspect: bool = True,
         fit_mode: str | None = None,

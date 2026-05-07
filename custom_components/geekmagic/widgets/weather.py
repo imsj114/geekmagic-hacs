@@ -329,7 +329,7 @@ class WeatherDisplay(Component):
         left_side = Icon(icon_name, size=icon_size, color=icon_tint)
 
         # Right side: temperature and optionally humidity
-        right_children = [
+        right_children: list[Component] = [
             Text(temp_str, font="large", bold=True, color=THEME_TEXT_PRIMARY, align="end")
         ]
 

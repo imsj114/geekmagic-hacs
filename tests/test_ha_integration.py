@@ -296,13 +296,14 @@ class TestEntityInteractions:
 
         state = hass.states.get("select.test_display_display")
         if state is None:
-            pytest.skip("Display select entity not found")
+            getattr(pytest, "skip")("Display select entity not found")  # noqa: B009
+        assert state is not None
 
         # Try selecting a builtin mode
         options = state.attributes.get("options", [])
         builtin_options = [o for o in options if o not in ("Custom", "custom")]
         if not builtin_options:
-            pytest.skip("No builtin options available")
+            getattr(pytest, "skip")("No builtin options available")  # noqa: B009
 
         await hass.services.async_call(
             "select",

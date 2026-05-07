@@ -15,7 +15,7 @@ from typing import TYPE_CHECKING
 # Add parent to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from PIL import Image
+from PIL import Image, ImageChops
 
 from custom_components.geekmagic.widgets.state import EntityState, WidgetState
 
@@ -186,6 +186,15 @@ def save_image(renderer: Renderer, img: Image.Image, name: str, output_dir: Path
     """Save the rendered image to disk."""
     final = renderer.finalize(img)
     output_path = output_dir / f"{name}.png"
+    if output_path.exists():
+        with Image.open(output_path) as existing_img:
+            existing = existing_img.convert(final.mode)
+            if (
+                existing.size == final.size
+                and ImageChops.difference(existing, final).getbbox() is None
+            ):
+                print(f"Unchanged: {output_path}")
+                return
     final.save(output_path)
     print(f"Generated: {output_path}")
 
@@ -1087,9 +1096,12 @@ def generate_widget_sizes(renderer: Renderer, output_dir: Path) -> None:
                 # Single widget using hero layout with minimal footer
                 layout = HeroLayout(footer_slots=1, hero_ratio=1.0, padding=padding, gap=gap)
                 layout.set_widget(0, make_widget(0))
-            elif layout_class is not None and num_slots == 2:
-                # Split layouts
-                layout = layout_class(ratio=0.5, padding=padding, gap=gap)
+            elif layout_suffix == "1x2":
+                layout = SplitHorizontal(ratio=0.5, padding=padding, gap=gap)
+                for i in range(2):
+                    layout.set_widget(i, make_widget(i))
+            elif layout_suffix == "2x1":
+                layout = SplitVertical(ratio=0.5, padding=padding, gap=gap)
                 for i in range(2):
                     layout.set_widget(i, make_widget(i))
             else:
@@ -2328,7 +2340,7 @@ def generate_layout_samples(renderer: Renderer, output_dir: Path) -> None:
         },
     )
 
-    chart_temp_history = [20, 21, 22, 21, 23, 24, 23, 22, 21, 22, 23, 24]
+    chart_temp_history: list[float] = [20, 21, 22, 21, 23, 24, 23, 22, 21, 22, 23, 24]
 
     # Each recipe is a callable returning a widget for the given slot index,
     # paired with optional history data.

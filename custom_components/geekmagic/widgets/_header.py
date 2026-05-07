@@ -43,9 +43,10 @@ class LabelValueHeader(Component):
         if not has_label and has_value:
             return "value_only"
 
+        label = self.label or ""
         font_label = ctx.get_font("small")
         font_value = ctx.get_font("regular")
-        label_w, label_h = ctx.get_text_size(self.label.upper(), font_label)
+        label_w, label_h = ctx.get_text_size(label.upper(), font_label)
         value_w, value_h = ctx.get_text_size(self.value, font_value)
         inline_fits = label_w + value_w + 4 <= inner_w
         stack_fits = (label_h + value_h + 4) <= int(total_height * 0.32) and total_height >= 90
@@ -86,12 +87,13 @@ class LabelValueHeader(Component):
 
         if mode == "empty":
             return
+        label = self.label or ""
 
         if mode == "stacked":
             Column(
                 children=[
                     Text(
-                        text=self.label.upper(),
+                        text=label.upper(),
                         font="small",
                         color=THEME_TEXT_SECONDARY,
                         align="center",
@@ -118,7 +120,7 @@ class LabelValueHeader(Component):
             Row(
                 children=[
                     Text(
-                        text=self.label.upper(),
+                        text=label.upper(),
                         font="small",
                         color=THEME_TEXT_SECONDARY,
                         align="start",
@@ -158,7 +160,7 @@ class LabelValueHeader(Component):
             Row(
                 children=[
                     Text(
-                        text=self.label.upper(),
+                        text=label.upper(),
                         font="small",
                         color=THEME_TEXT_SECONDARY,
                         align="center",

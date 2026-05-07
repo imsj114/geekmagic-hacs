@@ -137,12 +137,13 @@ class AttributeListDisplay(Component):
         # At narrow widths the title eats a row that would be better spent
         # on actual data; drop it.
         show_title = bool(self.title) and width >= 100
+        title = self.title or ""
 
         rows: list[Component] = []
         if show_title:
             rows.append(
                 Text(
-                    text=self.title.upper(),
+                    text=title.upper(),
                     font="small",
                     color=THEME_TEXT_SECONDARY,
                     align="start",

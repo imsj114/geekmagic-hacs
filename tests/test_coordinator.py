@@ -479,7 +479,7 @@ class TestCoordinatorBackoff:
         device.get_state = AsyncMock(return_value=None)
         device.get_space = AsyncMock(return_value=None)
         device.test_connection = AsyncMock(
-            return_value=ConnectionResult(success=True, error=None, message="OK")
+            return_value=ConnectionResult(success=True, error="none", message="OK")
         )
         return device
 
@@ -708,7 +708,7 @@ class TestCoordinatorBackoff:
 
         # Set up successful connection test
         backoff_device.test_connection = AsyncMock(
-            return_value=ConnectionResult(success=True, error=None, message="OK")
+            return_value=ConnectionResult(success=True, error="none", message="OK")
         )
 
         # Mock the rendering to succeed

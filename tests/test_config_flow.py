@@ -70,7 +70,9 @@ class TestConfigFlowUser:
 
         assert result["type"] == FlowResultType.FORM
         assert result["step_id"] == "user"
-        assert "host" in result["data_schema"].schema
+        data_schema = result["data_schema"]
+        assert data_schema is not None
+        assert "host" in data_schema.schema
 
     async def test_user_flow_connection_timeout(self, hass: HomeAssistant, aioclient_mock):
         """Test user flow shows timeout error when device times out."""
@@ -103,7 +105,9 @@ class TestConfigFlowUser:
 
         assert result["type"] == FlowResultType.FORM
         # OSError is caught by the generic except → "unknown"
-        assert result["errors"]["base"] in ("connection_refused", "unknown")
+        errors = result["errors"]
+        assert errors is not None
+        assert errors["base"] in ("connection_refused", "unknown")
 
     async def test_user_flow_success(self, hass: HomeAssistant, aioclient_mock):
         """Test successful user flow creates entry with default options."""
