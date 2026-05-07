@@ -79,7 +79,7 @@ class EntityWidget(Widget):
         if entity is None:
             value = PLACEHOLDER_VALUE
             unit = ""
-            name = self.config.label or self.config.entity_id or PLACEHOLDER_NAME
+            name = self.label_for(None, fallback=self.config.entity_id or PLACEHOLDER_NAME)
         else:
             # Get value from attribute or state
             if self.attribute:
@@ -101,7 +101,7 @@ class EntityWidget(Widget):
                 except (ValueError, TypeError):
                     pass  # Keep original value if not numeric
             unit = entity.unit if self.show_unit else ""
-            name = self.config.label or entity.friendly_name or entity.entity_id
+            name = self.label_for(entity)
 
         # Build display value with unit
         value_text = f"{value}{unit}" if unit else value

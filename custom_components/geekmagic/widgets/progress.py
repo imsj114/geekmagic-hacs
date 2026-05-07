@@ -339,10 +339,7 @@ class ProgressWidget(Widget):
         if not unit and entity:
             unit = entity.unit or ""
 
-        label = self.config.label
-        if not label and entity:
-            label = entity.friendly_name
-        label = label or "Progress"
+        label = self.label_for(entity, fallback="Progress")
 
         return ProgressDisplay(
             value=value,

@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING, Any, ClassVar
 if TYPE_CHECKING:
     from ..render_context import RenderContext
     from .components import Component
-    from .state import WidgetState
+    from .state import EntityState, WidgetState
 
 
 @dataclass
@@ -56,6 +56,21 @@ class Widget(ABC):
         if self.config.entity_id:
             return [self.config.entity_id]
         return []
+
+    def label_for(self, entity: EntityState | None, *, fallback: str = "") -> str:
+        """Resolve display label: ``config.label`` > ``entity.friendly_name`` > ``fallback``.
+
+        Pretty much every widget that renders a name needs this chain.
+        ``EntityState.friendly_name`` already falls back to ``entity_id``
+        when no friendly name attribute is set, so widgets that previously
+        wrote ``entity.friendly_name or entity.entity_id`` collapse to
+        a single ``self.label_for(entity, fallback=...)``.
+        """
+        if self.config.label:
+            return self.config.label
+        if entity is not None:
+            return entity.friendly_name
+        return fallback
 
     @abstractmethod
     def render(

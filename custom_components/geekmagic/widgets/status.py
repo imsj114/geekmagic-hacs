@@ -212,10 +212,7 @@ class StatusWidget(Widget):
         entity = state.entity
         is_on = _is_entity_on(entity)
 
-        name = self.config.label
-        if not name and entity:
-            name = entity.friendly_name
-        name = name or PLACEHOLDER_NAME
+        name = self.label_for(entity, fallback=PLACEHOLDER_NAME)
 
         return StatusIndicator(
             name=name,

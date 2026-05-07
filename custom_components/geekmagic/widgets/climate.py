@@ -435,7 +435,7 @@ class ClimateWidget(Widget):
             hvac_mode=entity.state,
             hvac_action=entity.get("hvac_action"),
             humidity=entity.get("humidity"),
-            name=self.config.label or entity.friendly_name,
+            name=self.label_for(entity),
             show_target=self.show_target,
             show_humidity=self.show_humidity,
             show_mode=self.show_mode,

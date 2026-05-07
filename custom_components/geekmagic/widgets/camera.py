@@ -120,12 +120,7 @@ class CameraWidget(Widget):
         if state.image is None:
             return _camera_placeholder(label=self.config.label or "No Image")
 
-        label = None
-        if self.show_label:
-            label = self.config.label
-            if not label and state.entity:
-                label = state.entity.friendly_name
-            label = label or "Camera"
+        label = self.label_for(state.entity, fallback="Camera") if self.show_label else None
 
         return CameraImage(
             image=state.image.convert("RGB") if state.image.mode != "RGB" else state.image,

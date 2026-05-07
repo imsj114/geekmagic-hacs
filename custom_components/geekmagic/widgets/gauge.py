@@ -114,7 +114,7 @@ class GaugeWidget(Widget):
         percent = calculate_percent(value, self.min_value, self.max_value)
 
         # Get label
-        name = self.config.label or (entity.friendly_name if entity else "")
+        name = self.label_for(entity)
 
         # Determine color
         threshold_color = self._get_threshold_color(value)
