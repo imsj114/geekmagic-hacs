@@ -14,17 +14,6 @@ if TYPE_CHECKING:
     from .state import EntityState, WidgetState
 
 
-def _extract_numeric(entity: EntityState | None, attribute: str | None = None) -> float:
-    """Extract numeric value from entity state."""
-    if entity is None:
-        return 0.0
-    value = entity.get(attribute) if attribute else entity.state
-    try:
-        return float(value)
-    except (ValueError, TypeError):
-        return 0.0
-
-
 def _resolve_label(config: WidgetConfig, entity: EntityState | None) -> str:
     """Get label from config or entity friendly_name."""
     if config.label:
@@ -122,7 +111,7 @@ class GaugeWidget(Widget):
         entity = state.entity
 
         # Extract numeric value
-        value = _extract_numeric(entity, self.attribute)
+        value = entity.numeric(self.attribute) if entity is not None else 0.0
         display_value = f"{value:.0f}" if entity is not None else "--"
 
         # Get unit from entity if not configured

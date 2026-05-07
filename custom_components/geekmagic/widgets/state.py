@@ -50,6 +50,22 @@ class EntityState:
         """Get attribute value."""
         return self.attributes.get(key, default)
 
+    def numeric(self, attribute: str | None = None, default: float = 0.0) -> float:
+        """Coerce the state (or an attribute) to float, with a safe fallback.
+
+        Widgets reach for this constantly — gauges, progress bars, sparkline
+        sources — and used to each carry their own ``_extract_numeric``
+        helper. Centralising it here keeps the conversion rule (any
+        ValueError/TypeError → ``default``) in one place.
+        """
+        raw = self.attributes.get(attribute) if attribute else self.state
+        if raw is None:
+            return default
+        try:
+            return float(raw)  # type: ignore[arg-type]
+        except (ValueError, TypeError):
+            return default
+
 
 @dataclass(frozen=True)
 class WidgetState:

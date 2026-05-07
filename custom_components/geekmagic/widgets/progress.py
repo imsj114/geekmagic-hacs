@@ -25,17 +25,7 @@ from .helpers import format_number
 
 if TYPE_CHECKING:
     from ..render_context import RenderContext
-    from .state import EntityState, WidgetState
-
-
-def _extract_numeric(entity: EntityState | None) -> float:
-    """Extract numeric value from entity state."""
-    if entity is None:
-        return 0.0
-    try:
-        return float(entity.state)
-    except (ValueError, TypeError):
-        return 0.0
+    from .state import WidgetState
 
 
 @dataclass
@@ -343,7 +333,7 @@ class ProgressWidget(Widget):
     def render(self, ctx: RenderContext, state: WidgetState) -> Component:
         """Render the progress widget."""
         entity = state.entity
-        value = _extract_numeric(entity)
+        value = entity.numeric() if entity is not None else 0.0
 
         unit = self.unit
         if not unit and entity:
@@ -492,7 +482,7 @@ class MultiProgressWidget(Widget):
         for i, item in enumerate(self.items):
             entity_id = item.get("entity_id")
             entity = state.get_entity(entity_id) if entity_id else None
-            value = _extract_numeric(entity)
+            value = entity.numeric() if entity is not None else 0.0
 
             label = item.get("label", "")
             if entity and not label:
