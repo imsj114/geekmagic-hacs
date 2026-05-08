@@ -75,6 +75,7 @@ class ProgressDisplay(Component):
             caption=self.label,
             icon=self.icon,
             icon_color=self.color,
+            icon_role="feature",
             hero=f"{percent:.0f}%",
             supporting=[Chip(value_str)] if value_str else [],
             indicator=Bar(percent=percent, color=self.color, height=bar_height),
@@ -149,14 +150,13 @@ class MultiProgressDisplay(Component):
     def render(self, ctx: RenderContext, x: int, y: int, width: int, height: int) -> None:
         """Render multi-progress list."""
         padding = int(width * 0.05)
-        row_count = len(self.items) or 1
 
         # Calculate sizes
-        title_height = int(height * 0.14) if self.title else 0
-        available_height = height - title_height - padding * 2
-        row_height = min(int(height * 0.35), available_height // row_count)
         bar_height = max(4, int(height * 0.06))
-        icon_size = max(8, int(height * 0.09))
+        # Bumped from 0.09 -> 0.13: at 240 px the icon is 31 px (was
+        # 21), big enough to actually read at a glance instead of
+        # registering as a tiny dot beside the label.
+        icon_size = max(12, int(height * 0.13))
 
         # Build component tree
         children = []
@@ -198,35 +198,42 @@ class MultiProgressDisplay(Component):
             top_row_children.extend(
                 [
                     Text(
-                        text=label.upper(), font="tiny", color=THEME_TEXT_SECONDARY, align="start"
+                        text=label.upper(),
+                        font="small",
+                        color=THEME_TEXT_SECONDARY,
+                        align="start",
                     ),
                     Spacer(),
-                    Text(text=value_text, font="tiny", color=THEME_TEXT_PRIMARY, align="end"),
+                    Text(text=value_text, font="small", color=THEME_TEXT_PRIMARY, align="end"),
                 ]
             )
 
             # Bottom row: Bar + Percent
             bottom_row_children: list[Component] = [
                 Flex(Bar(percent=percent, color=color, height=bar_height)),
-                Text(text=f"{percent:.0f}%", font="tiny", color=THEME_TEXT_PRIMARY, align="end"),
+                Text(text=f"{percent:.0f}%", font="small", color=THEME_TEXT_PRIMARY, align="end"),
             ]
 
-            # Combine into a column for this item
+            # Combine label-row and bar-row into a column for this item.
+            # Use a tight intra-item gap so the bar reads as part of the
+            # same activity as its label/value, not a separate band.
             item_column = Column(
                 children=[
                     Row(children=top_row_children, gap=4, align="center", padding=padding),
                     Row(children=bottom_row_children, gap=8, align="center", padding=padding),
                 ],
-                gap=int(row_height * 0.15),
+                gap=2,
                 justify="center",
                 align="stretch",  # Stretch rows to full width for Spacer to work
             )
             children.append(item_column)
 
-        # Render the entire column
+        # Render the entire column. Inter-item gap is larger than the
+        # intra-item gap so each (label / bar) pair groups visually
+        # while distinct activities stay separated.
         Column(
             children=children,
-            gap=int(height * 0.02),
+            gap=max(8, int(height * 0.05)),
             justify="start",
             align="stretch",  # Stretch to full width
             padding=0,

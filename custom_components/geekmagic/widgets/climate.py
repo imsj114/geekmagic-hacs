@@ -14,6 +14,7 @@ from .components import (
     THEME_TEXT_SECONDARY,
     THEME_WARNING,
     Color,
+    Column,
     Component,
     Icon,
     Text,
@@ -106,8 +107,6 @@ def _hvac_visual(hvac_action: str | None, hvac_mode: str) -> tuple[str, Color]:
 
 def _climate_placeholder() -> Component:
     """Create placeholder component when no climate data."""
-    from .components import Column  # local import — only needed for the placeholder
-
     return Column(
         children=[
             Icon("thermostat", color=THEME_TEXT_SECONDARY, max_size=48),

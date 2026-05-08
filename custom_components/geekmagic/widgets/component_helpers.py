@@ -81,6 +81,7 @@ class BarGauge(Component):
             caption=self.label,
             icon=self.icon,
             icon_color=self.color,
+            icon_role="feature",
             hero=self.value,
             hero_color=self.color,  # Activity-bar style: hero matches the bar tint
             indicator=indicator,

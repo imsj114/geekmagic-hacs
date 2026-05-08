@@ -51,32 +51,31 @@ class TestPickCardMode:
         assert pick_card_mode(110, 110) == "stacked"
         assert pick_card_mode(150, 150) == "stacked"
 
-    def test_stacked_floor_is_100(self) -> None:
-        # Just below the floor → compact, even though aspect is square.
-        assert pick_card_mode(99, 99) == "compact"
+    def test_stacked_floor_is_65(self) -> None:
+        # Just below the 65 px floor → compact.
+        assert pick_card_mode(64, 64) == "compact"
+        # At the floor → stacked (band-aware icon sizing keeps it readable).
+        assert pick_card_mode(65, 65) == "stacked"
 
-    def test_compact_for_wide_short_cells(self) -> None:
-        assert pick_card_mode(240, 80) == "compact"
+    def test_compact_only_for_very_short_cells(self) -> None:
+        # short_side < 80 — too tight even for a band-aware stacked card.
         assert pick_card_mode(160, 60) == "compact"
+        assert pick_card_mode(60, 60) == "compact"
 
-    def test_compact_for_tiny_grids(self) -> None:
-        # 3x3 grid cells — neither square enough nor tall enough.
-        assert pick_card_mode(70, 70) == "compact"
+    def test_wide_short_cells_with_short_side_at_floor(self) -> None:
+        # 240x80 / 240x120 cells now go stacked: band-aware icon sizing
+        # keeps the icon proportional and the chip strip gets its own
+        # band instead of being squeezed into compact mode.
+        assert pick_card_mode(240, 80) == "stacked"
+        assert pick_card_mode(240, 120) == "stacked"
 
     def test_vertical_only_with_vertical_bar(self) -> None:
-        # 80x240 is height > width x 1.8, but no VerticalBar → compact.
-        assert pick_card_mode(80, 240) == "compact"
-        # With a VerticalBar indicator, switch to vertical mode.
+        # 80x240 has short_side=80 and height > width x 1.8 - without a
+        # VerticalBar it falls back to stacked (the ``short_side >= 80``
+        # rule wins); with a VerticalBar, vertical mode kicks in.
+        assert pick_card_mode(80, 240) == "stacked"
         bar = VerticalBar(percent=50, color=THEME_PRIMARY)
         assert pick_card_mode(80, 240, bar) == "vertical"
-
-    def test_vertical_threshold_is_strict(self) -> None:
-        # height > width x 1.8 — exactly 1.8 isn't vertical (strict gt).
-        # At the boundary the cell falls into stacked (long_side <=
-        # short_side * 1.8 mirror-symmetric), past it into vertical.
-        bar = VerticalBar(percent=50, color=THEME_PRIMARY)
-        assert pick_card_mode(100, 180, bar) == "stacked"
-        assert pick_card_mode(100, 181, bar) == "vertical"
 
     def test_ring_indicator_forces_ring_mode(self) -> None:
         ring = Ring(percent=50, color=THEME_PRIMARY)
@@ -98,13 +97,14 @@ class TestCellMetrics:
         m = cell_metrics(30, 30)
         assert m.padding >= 2
 
-    def test_icon_size_clamps_to_48(self) -> None:
-        # Big cell — 30% of 240 = 72, clamped down to 48.
+    def test_icon_size_clamps_to_80(self) -> None:
+        # Big cell — 55% of 240 = 132, clamped down to 80.
         m = cell_metrics(240, 240)
-        assert m.icon_size == 48
+        assert m.icon_size == 80
 
     def test_icon_size_floor_is_16(self) -> None:
-        m = cell_metrics(40, 40)
+        # Tiny cell — 55% of 28 = 15, clamped up to 16.
+        m = cell_metrics(28, 28)
         assert m.icon_size == 16
 
 
@@ -154,13 +154,20 @@ class TestDataCardStacked:
         assert hero_row.children[0].color == THEME_TEXT_PRIMARY  # type: ignore[union-attr]
 
     def test_supporting_strip_present_when_chips_given(self) -> None:
-        chips = [Chip("22°", icon="mdi:target")]
-        col = self._stacked(caption="HEATING", hero="21°", supporting=chips)
-        # Bands: caption, hero, supporting → 3.
+        col = self._stacked(caption="HEATING", hero="21°", supporting=[Chip("22°")])
         assert len(col.children) == 3
         support = col.children[2]
         assert isinstance(support, Row)
-        assert support.justify == "space-around"
+        assert support.justify == "center"
+
+    def test_multi_chip_supporting_strip_centred(self) -> None:
+        # Two chips centred together rather than pushed to opposite
+        # edges (Adaptive's space-between default).
+        chips = [Chip("22°"), Chip("58%", icon="mdi:water-percent")]
+        col = self._stacked(caption="HEATING", hero="21°", supporting=chips)
+        support = col.children[2]
+        assert isinstance(support, Row)
+        assert support.justify == "center"
 
     def test_indicator_appended_at_the_end(self) -> None:
         bar = Bar(percent=73, color=THEME_PRIMARY)
@@ -180,25 +187,39 @@ class TestDataCardCompact:
         assert isinstance(col, Column)
         assert col.justify == "space-evenly"
 
-    def test_header_uses_adaptive(self) -> None:
+    def test_header_uses_adaptive_when_multiple_children(self) -> None:
+        from custom_components.geekmagic.widgets.components import Flex
+
         col = self._compact(caption="CPU", hero="73%")
-        header = col.children[0]
-        assert isinstance(header, Adaptive)
+        # Single-band cards Flex-wrap so the header fills the cell.
+        flex = col.children[0]
+        assert isinstance(flex, Flex)
+        assert isinstance(flex.child, Adaptive)
 
     def test_compact_header_has_spacer_between_caption_and_hero(self) -> None:
+        from custom_components.geekmagic.widgets.components import Flex
+
         col = self._compact(caption="CPU", hero="73%")
-        header = cast("Adaptive", col.children[0])
+        flex = cast("Flex", col.children[0])
+        header = cast("Adaptive", flex.child)
         # Children: caption text, Spacer, hero text.
         assert isinstance(header.children[0], Text)
         assert isinstance(header.children[1], Spacer)
         assert isinstance(header.children[2], Text)
 
-    def test_compact_no_spacer_when_only_hero(self) -> None:
-        col = self._compact(hero="73%")
-        header = cast("Adaptive", col.children[0])
-        # Just the hero text — no leading caption, no spacer.
-        assert len(header.children) == 1
-        assert isinstance(header.children[0], Text)
+    def test_compact_lone_hero_uses_centered_row(self) -> None:
+        # Bare hero (clock case) wraps in a centred Row, then the whole
+        # single-band header gets Flex-wrapped to fill the cell.
+        from custom_components.geekmagic.widgets.components import Flex
+
+        col = self._compact(hero="10:30")
+        flex = col.children[0]
+        assert isinstance(flex, Flex)
+        row = flex.child
+        assert isinstance(row, Row)
+        assert row.justify == "center"
+        assert len(row.children) == 1
+        assert isinstance(row.children[0], Text)
 
     def test_compact_indicator_appended(self) -> None:
         bar = Bar(percent=73, color=THEME_PRIMARY)
@@ -263,9 +284,10 @@ class TestDataCardAutoMode:
         ("width", "height", "indicator", "expected"),
         [
             (110, 110, None, "stacked"),
-            (240, 80, None, "compact"),
-            (70, 70, None, "compact"),
-            (80, 240, None, "compact"),  # No vertical bar → compact, not vertical
+            (240, 80, None, "stacked"),  # short_side=80 → stacked (band-aware)
+            (65, 65, None, "stacked"),  # at the new 65-px floor
+            (60, 60, None, "compact"),  # below the floor → compact
+            (80, 240, None, "stacked"),  # No VerticalBar → stacked at floor
             (80, 240, VerticalBar(percent=50, color=THEME_PRIMARY), "vertical"),
             (110, 110, Ring(percent=50, color=THEME_PRIMARY), "ring"),
         ],

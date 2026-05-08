@@ -63,6 +63,7 @@ class StatusIndicator(Component):
             caption=self.name,
             icon=self.icon,
             icon_color=color,
+            icon_role="feature",
             hero=status_text if self.show_status_text else "",
             hero_color=color,
         ).render(ctx, x, y, width, height)
@@ -187,7 +188,7 @@ class StatusListDisplay(Component):
             if icon:
                 row_children.append(Icon(name=icon, size=icon_size, color=color))
             row_children.append(
-                Text(text=display_label, font="tiny", color=THEME_TEXT_PRIMARY, align="start")
+                Text(text=display_label, font="small", color=THEME_TEXT_PRIMARY, align="start")
             )
 
             if self.on_text or self.off_text:
@@ -195,7 +196,7 @@ class StatusListDisplay(Component):
                 if status_text:
                     row_children.append(Spacer())
                     row_children.append(
-                        Text(text=status_text, font="tiny", bold=True, color=color, align="end")
+                        Text(text=status_text, font="small", bold=True, color=color, align="end")
                     )
 
             Row(

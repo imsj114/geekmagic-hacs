@@ -264,53 +264,116 @@ class WeatherDisplay(Component):
         icon_name: str,
         icon_tint: Color,
     ) -> Component:
-        """Build semi-compact layout with mini forecast icons."""
+        """Build semi-compact layout: icon + temp on top, mini forecast
+        on the bottom.
+
+        In wide cells (>= 200 px), the top row also includes the
+        condition text + humidity, and the forecast strip shows day
+        labels + temperatures. In narrow cells (e.g. 80x120 grid
+        squares), only the temp is shown on top and the forecast is
+        icon-only — otherwise the text crashes into itself.
+        """
         padding = int(width * 0.04)
         icon_size = max(16, min(28, int(height * 0.28)))
-        mini_icon_size = max(10, int(height * 0.12))
+        mini_icon_size = max(10, int(height * 0.18))
         temp_str = f"{self.temperature}°" if self.temperature != "--" else "--"
+        is_wide = width >= 200
 
-        # Top row: current weather (icon + temp), tinted by condition
+        # Top row: always icon + temp; only add condition + humidity in
+        # wide cells.
+        top_children: list[Component] = [
+            Icon(icon_name, size=icon_size, color=icon_tint),
+            Text(temp_str, font="large", bold=True, color=THEME_TEXT_PRIMARY),
+        ]
+        if is_wide:
+            top_children.append(
+                Text(
+                    self.condition.replace("-", " ").title(),
+                    font="tiny",
+                    color=THEME_TEXT_SECONDARY,
+                )
+            )
+            if self.show_humidity and self.humidity != "--":
+                top_children.append(
+                    Text(f"{self.humidity}%", font="tiny", color=THEME_INFO),
+                )
         top_row = Row(
-            children=[
-                Icon(icon_name, size=icon_size, color=icon_tint),
-                Text(temp_str, font="large", bold=True, color=THEME_TEXT_PRIMARY),
-            ],
-            gap=4,
+            children=top_children,
+            gap=6,
             align="center",
             justify="center",
         )
 
-        # Bottom row: mini forecast icons (3 days, icons only)
-        forecast_icons: list[Component] = []
-        for day in self.forecast[: min(3, self.forecast_days)]:
-            day_condition = day.get("condition", "sunny")
-            day_icon = WEATHER_ICONS.get(day_condition, "weather-sunny")
-            day_tint = WEATHER_ROLES.get(day_condition, THEME_WARNING)
-            forecast_icons.append(Icon(day_icon, size=mini_icon_size, color=day_tint))
+        # Bottom row: forecast columns. Wide cells get day labels + temps;
+        # narrow cells get icons only (forecast columns become Icons,
+        # space-around).
+        bottom_row: Component | None = None
+        forecast_items = self.forecast[: min(3, self.forecast_days)]
+        if forecast_items:
+            if is_wide:
+                forecast_columns: list[Component] = []
+                for i, day in enumerate(forecast_items):
+                    day_condition = day.get("condition", "sunny")
+                    day_icon = WEATHER_ICONS.get(day_condition, "weather-sunny")
+                    day_tint = WEATHER_ROLES.get(day_condition, THEME_WARNING)
+                    day_temp = day.get("temperature", "--")
+                    day_temp_low = day.get("templow")
+                    day_name = _parse_forecast_day_name(day.get("datetime", ""), f"D{i + 1}")
+                    if self.show_high_low and day_temp_low is not None:
+                        day_temp_str = f"{day_temp}°/{day_temp_low}°"
+                    else:
+                        day_temp_str = f"{day_temp}°"
+                    forecast_columns.append(
+                        Column(
+                            children=[
+                                Text(
+                                    day_name.upper(),
+                                    font="tiny",
+                                    color=THEME_TEXT_SECONDARY,
+                                ),
+                                Icon(day_icon, size=mini_icon_size, color=day_tint),
+                                Text(
+                                    day_temp_str,
+                                    font="tiny",
+                                    bold=True,
+                                    color=THEME_TEXT_PRIMARY,
+                                ),
+                            ],
+                            gap=2,
+                            align="center",
+                            justify="center",
+                        )
+                    )
+                bottom_row = Row(
+                    children=forecast_columns,
+                    gap=0,
+                    align="center",
+                    justify="space-around",
+                )
+            else:
+                forecast_icons: list[Component] = []
+                for day in forecast_items:
+                    day_condition = day.get("condition", "sunny")
+                    day_icon = WEATHER_ICONS.get(day_condition, "weather-sunny")
+                    day_tint = WEATHER_ROLES.get(day_condition, THEME_WARNING)
+                    forecast_icons.append(Icon(day_icon, size=mini_icon_size, color=day_tint))
+                bottom_row = Row(
+                    children=forecast_icons,
+                    gap=int(width * 0.06),
+                    align="center",
+                    justify="center",
+                )
 
-        bottom_row = (
-            Row(
-                children=forecast_icons,
-                gap=int(width * 0.08),
-                align="center",
-                justify="center",
-            )
-            if forecast_icons
-            else None
-        )
-
-        # Stack vertically
         children: list[Component] = [top_row]
         if bottom_row:
             children.append(bottom_row)
 
         return Column(
             children=children,
-            gap=int(height * 0.08),
+            gap=int(height * 0.04),
             padding=padding,
-            align="center",
-            justify="center",
+            align="stretch",
+            justify="space-evenly",
         )
 
     def _build_compact(
