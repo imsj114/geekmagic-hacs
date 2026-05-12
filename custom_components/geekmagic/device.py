@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import re
 from dataclasses import dataclass
 from typing import Literal
 from urllib.parse import urlparse
@@ -371,20 +372,33 @@ class GeekMagicDevice:
     async def detect_model(self) -> str:
         """Attempt to detect the device model.
 
-        Pro devices use /.sys/ paths, Ultra devices use root paths.
+        Pro devices serve a JSON document at /.sys/app.json; Ultra devices
+        either 404 that path or return a non-JSON catch-all response. We
+        require a parseable JSON body before declaring a device "Pro" so
+        the same Ultra cannot flip-flop between models across setups.
         Returns MODEL_PRO, MODEL_ULTRA, or MODEL_UNKNOWN.
         """
         session = await self._get_session()
 
-        # Try Pro-specific path first (/.sys/app.json)
+        # Try Pro-specific path first (/.sys/app.json). A 200 status alone
+        # is not enough — some Ultra firmware versions answer any unknown
+        # path with a catch-all HTML page. Require a JSON body to confirm.
         try:
             async with session.get(
                 f"{self.base_url}/.sys/app.json", timeout=aiohttp.ClientTimeout(total=5)
             ) as response:
                 if response.status == 200:
-                    self.model = MODEL_PRO
-                    _LOGGER.info("Detected device model: SmallTV Pro")
-                    return self.model
+                    try:
+                        await response.json(content_type=None)
+                    except (aiohttp.ContentTypeError, ValueError) as parse_err:
+                        _LOGGER.debug(
+                            "/.sys/app.json returned 200 but not JSON (%s); not a Pro",
+                            parse_err,
+                        )
+                    else:
+                        self.model = MODEL_PRO
+                        _LOGGER.info("Detected device model: SmallTV Pro")
+                        return self.model
         except Exception as err:
             _LOGGER.debug("Pro path /.sys/app.json not available: %s", err)
 
@@ -402,3 +416,75 @@ class GeekMagicDevice:
 
         _LOGGER.warning("Could not detect device model for %s", self.host)
         return MODEL_UNKNOWN
+
+    async def get_mac(self) -> str | None:
+        """Best-effort fetch of the device's MAC address.
+
+        The GeekMagic firmware does not document a stable endpoint for this,
+        so we probe a handful of paths observed across Pro / Ultra firmware
+        revisions. Returns a normalized lowercase, colon-separated MAC
+        string (e.g. ``aa:bb:cc:dd:ee:ff``), or ``None`` if nothing usable
+        is found. Callers should treat ``None`` as "fall back to host".
+        """
+        session = await self._get_session()
+
+        # Endpoints to probe, in order of preference. Pro firmware tends to
+        # use /.sys/* paths; Ultra puts everything at the root.
+        candidates = (
+            "/app.json",
+            "/.sys/app.json",
+            "/info.json",
+            "/.sys/info.json",
+            "/sysinfo.json",
+            "/wifi.json",
+        )
+        # Field names that have been observed to carry MAC-like values.
+        mac_fields = ("mac", "MAC", "macAddress", "mac_address", "sta_mac", "wifi_mac")
+
+        for path in candidates:
+            try:
+                async with session.get(
+                    f"{self.base_url}{path}", timeout=aiohttp.ClientTimeout(total=5)
+                ) as response:
+                    if response.status != 200:
+                        continue
+                    try:
+                        data = await response.json(content_type=None)
+                    except (aiohttp.ContentTypeError, ValueError):
+                        continue
+            except Exception as err:
+                _LOGGER.debug("MAC probe %s failed: %s", path, err)
+                continue
+
+            if not isinstance(data, dict):
+                continue
+            for field in mac_fields:
+                raw = data.get(field)
+                if not isinstance(raw, str):
+                    continue
+                normalized = _normalize_mac(raw)
+                if normalized is not None:
+                    _LOGGER.debug("Found MAC %s via %s.%s", normalized, path, field)
+                    return normalized
+
+        _LOGGER.debug("No MAC address exposed by device at %s", self.host)
+        return None
+
+
+_MAC_RE_COLON = "^[0-9a-fA-F]{2}([:-][0-9a-fA-F]{2}){5}$"
+_MAC_RE_HEX12 = "^[0-9a-fA-F]{12}$"
+
+
+def _normalize_mac(raw: str) -> str | None:
+    """Normalize a MAC string to ``aa:bb:cc:dd:ee:ff`` form, or None.
+
+    Accepts the common forms returned by ESP firmware: colon-separated,
+    dash-separated, or bare 12-hex-chars. Anything else is rejected so
+    we don't latch onto an unrelated string.
+    """
+    candidate = raw.strip().lower()
+    if re.match(_MAC_RE_COLON, candidate):
+        return candidate.replace("-", ":")
+    if re.match(_MAC_RE_HEX12, candidate):
+        return ":".join(candidate[i : i + 2] for i in range(0, 12, 2))
+    return None

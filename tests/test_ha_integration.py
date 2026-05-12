@@ -406,6 +406,135 @@ class TestDeviceRegistry:
         assert "Ultra" in (main_device[0].model or "")
 
 
+class TestUniqueIdMigration:
+    """v1 → v2 migration: host-based unique_id → MAC-based unique_id."""
+
+    async def test_migration_rewrites_unique_id_to_mac(self, hass: HomeAssistant, aioclient_mock):
+        """v1 entry with host unique_id is migrated to MAC on setup."""
+        # Register the MAC-bearing /app.json mock FIRST so it wins the
+        # match against later catch-alls in setup_device_http_mocks.
+        base = BASE_URL
+        aioclient_mock.get(
+            f"{base}/app.json",
+            json={
+                "theme": 0,
+                "brt": 50,
+                "img": "/image/dashboard.jpg",
+                "mac": "AA:BB:CC:DD:EE:FF",
+            },
+        )
+        setup_device_http_mocks(aioclient_mock)
+
+        entry = MockConfigEntry(
+            domain=DOMAIN,
+            title="Test Display",
+            data={"host": DEVICE_HOST, "name": "Test Display"},
+            options={},
+            unique_id=DEVICE_HOST,  # legacy: host-based unique_id
+            version=1,
+        )
+        entry.add_to_hass(hass)
+
+        await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+
+        assert entry.version == 2
+        assert entry.unique_id == "aa:bb:cc:dd:ee:ff"
+        assert entry.state is ConfigEntryState.LOADED
+
+    async def test_migration_keeps_host_when_mac_unavailable(
+        self, hass: HomeAssistant, aioclient_mock
+    ):
+        """Devices that do not expose a MAC keep the host unique_id but bump version."""
+        setup_device_http_mocks(aioclient_mock)
+
+        entry = MockConfigEntry(
+            domain=DOMAIN,
+            title="Test Display",
+            data={"host": DEVICE_HOST, "name": "Test Display"},
+            options={},
+            unique_id=DEVICE_HOST,
+            version=1,
+        )
+        entry.add_to_hass(hass)
+
+        await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+
+        assert entry.version == 2
+        # No MAC available — host unique_id is preserved.
+        assert entry.unique_id == DEVICE_HOST
+
+
+class TestDuplicateDeviceCleanup:
+    """Stale host-keyed device entries from older versions are removed."""
+
+    async def test_cleanup_removes_orphan_host_device(self, hass: HomeAssistant, aioclient_mock):
+        """A pre-existing host-keyed device record is deleted on setup."""
+        from homeassistant.helpers import device_registry as dr
+
+        setup_device_http_mocks(aioclient_mock)
+        entry = create_entry()
+        entry.add_to_hass(hass)
+
+        # Simulate the orphan device that older image.py would have left
+        # behind: same config_entry, host-based identifier, model="SmallTV Pro".
+        dev_reg = dr.async_get(hass)
+        stale = dev_reg.async_get_or_create(
+            config_entry_id=entry.entry_id,
+            identifiers={(DOMAIN, DEVICE_HOST)},
+            manufacturer="GeekMagic",
+            model="SmallTV Pro",
+            name="Test Display",
+        )
+        stale_id = stale.id
+
+        await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+
+        # The stale device must have been removed.
+        assert dev_reg.async_get(stale_id) is None
+        # And the canonical (entry_id-keyed) device must exist with the
+        # detected model — single device, not two.
+        devices = dr.async_entries_for_config_entry(dev_reg, entry.entry_id)
+        geekmagic_devices = [d for d in devices if d.manufacturer == "GeekMagic"]
+        assert len(geekmagic_devices) == 1
+        assert (DOMAIN, entry.entry_id) in geekmagic_devices[0].identifiers
+        assert "Ultra" in (geekmagic_devices[0].model or "")
+
+    async def test_cleanup_leaves_unrelated_devices_alone(
+        self, hass: HomeAssistant, aioclient_mock
+    ):
+        """A device with the same host identifier but a different config entry is kept."""
+        from homeassistant.helpers import device_registry as dr
+
+        setup_device_http_mocks(aioclient_mock)
+
+        # An unrelated config entry from some other integration that
+        # happens to use the same string as an identifier.
+        other_entry = MockConfigEntry(
+            domain="some_other_integration",
+            data={},
+        )
+        other_entry.add_to_hass(hass)
+
+        dev_reg = dr.async_get(hass)
+        unrelated = dev_reg.async_get_or_create(
+            config_entry_id=other_entry.entry_id,
+            identifiers={(DOMAIN, DEVICE_HOST)},
+            manufacturer="SomethingElse",
+            name="Not ours",
+        )
+
+        entry = create_entry()
+        entry.add_to_hass(hass)
+        await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+
+        # The unrelated device must survive (different config_entry_id).
+        assert dev_reg.async_get(unrelated.id) is not None
+
+
 class TestOptionsUpdate:
     """Test that options updates propagate correctly."""
 

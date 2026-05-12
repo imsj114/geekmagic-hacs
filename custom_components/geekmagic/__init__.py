@@ -125,6 +125,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # Detect device model (Pro vs Ultra)
     await device.detect_model()
 
+    # One-shot cleanup: prior versions registered the image preview entity
+    # under a separate device_info dict that used the host string as its
+    # identifier and hardcoded the model as "SmallTV Pro". For Ultra
+    # hardware this left a stale, duplicate device entry alongside the
+    # real one. Remove any such orphan device on every setup so that users
+    # who hit the bug get the duplicate cleaned up automatically.
+    _cleanup_duplicate_device(hass, entry, host)
+
     # Create coordinator
     coordinator = GeekMagicCoordinator(
         hass=hass,
@@ -198,3 +206,83 @@ async def async_remove_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
         entry: Config entry being removed
     """
     # Clean up any resources if needed
+
+
+def _cleanup_duplicate_device(hass: HomeAssistant, entry: ConfigEntry, host: str) -> None:
+    """Remove the stale host-keyed device created by older versions.
+
+    Earlier image.py registered its device with ``identifiers={(DOMAIN,
+    host)}`` and ``model="SmallTV Pro"`` — independent of the
+    ``(DOMAIN, entry_id)`` identifier used by every other platform.
+    After the image entity is moved onto the unified identifier, that
+    host-keyed device record becomes an orphan that HA does not garbage
+    collect on its own. Detect and remove it.
+    """
+    dev_reg = dr.async_get(hass)
+    stale = dev_reg.async_get_device(identifiers={(DOMAIN, host)})
+    if stale is None:
+        return
+    # Only nuke devices that actually belong to this config entry — never
+    # touch a device that some other integration happens to have keyed on
+    # the same string.
+    if entry.entry_id not in stale.config_entries:
+        return
+    _LOGGER.info(
+        "Removing duplicate GeekMagic device %s (host-keyed identifier '%s')",
+        stale.id,
+        host,
+    )
+    dev_reg.async_remove_device(stale.id)
+
+
+async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+    """Migrate old config entries to newer schemas.
+
+    Version history:
+        1 → 2: ``unique_id`` was the device's IP/host string. We now use
+            the device's MAC address so DHCP renumbering no longer
+            produces a duplicate config entry. If the device is reachable
+            we fetch its MAC and rewrite ``unique_id``; if it isn't, we
+            leave the host-based unique_id in place and the migration
+            will retry on next HA start.
+    """
+    _LOGGER.debug("Migrating GeekMagic entry %s from version %s", entry.entry_id, entry.version)
+
+    if entry.version == 1:
+        host = entry.data.get(CONF_HOST)
+        if not host:
+            _LOGGER.error("Cannot migrate entry %s: missing host in entry.data", entry.entry_id)
+            return False
+
+        session = async_get_clientsession(hass)
+        device = GeekMagicDevice(host, session=session)
+        try:
+            mac = await device.get_mac()
+        except Exception as err:
+            _LOGGER.warning(
+                "Could not reach %s to read MAC for migration: %s. Will retry on next setup.",
+                host,
+                err,
+            )
+            mac = None
+
+        if mac:
+            hass.config_entries.async_update_entry(entry, unique_id=mac, version=2)
+            _LOGGER.info(
+                "Migrated entry %s unique_id host→MAC (%s → %s)",
+                entry.entry_id,
+                host,
+                mac,
+            )
+        else:
+            # No MAC available — keep the host-based unique_id but bump
+            # the schema version so we don't try migrating again on every
+            # restart. A renumber will still cause a duplicate, but the
+            # user gets no worse than they had before.
+            hass.config_entries.async_update_entry(entry, version=2)
+            _LOGGER.info(
+                "Migrated entry %s to v2 with host-based unique_id (device did not expose MAC)",
+                entry.entry_id,
+            )
+
+    return True

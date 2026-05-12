@@ -409,9 +409,13 @@ class TestDeviceModelDetection:
         """Test detecting Pro model via /.sys/app.json."""
         from custom_components.geekmagic.const import MODEL_PRO
 
-        # Create mock response for Pro path
+        # Create mock response for Pro path. detect_model now requires
+        # both a 200 status AND a parseable JSON body — Ultra firmware
+        # versions that answer unknown paths with a catch-all HTML page
+        # would otherwise be mis-identified as Pro.
         mock_response = MagicMock()
         mock_response.status = 200
+        mock_response.json = AsyncMock(return_value={"theme": 0, "brt": 50, "img": None})
         mock_response.__aenter__ = AsyncMock(return_value=mock_response)
         mock_response.__aexit__ = AsyncMock()
         mock_session.get = MagicMock(return_value=mock_response)
@@ -423,8 +427,43 @@ class TestDeviceModelDetection:
         assert device.model == MODEL_PRO
         # Should have tried Pro path first
         mock_session.get.assert_called()
-        call_url = mock_session.get.call_args[0][0]
+        call_url = mock_session.get.call_args_list[0][0][0]
         assert "/.sys/app.json" in call_url
+
+    @pytest.mark.asyncio
+    async def test_detect_model_ultra_when_sys_path_returns_html(self, mock_session):
+        """Regression: an Ultra that 200s /.sys/app.json with HTML is Ultra.
+
+        Some Ultra firmware revisions return a catch-all page (200 + HTML)
+        for unknown paths. The previous heuristic checked only the status
+        code and mis-identified those devices as Pro — producing a
+        duplicate device in HA (one Pro, one Ultra). Requiring a valid
+        JSON body resolves it.
+        """
+        import aiohttp
+
+        from custom_components.geekmagic.const import MODEL_ULTRA
+
+        sys_response = MagicMock()
+        sys_response.status = 200
+        sys_response.json = AsyncMock(
+            side_effect=aiohttp.ContentTypeError(MagicMock(), (), message="not json")
+        )
+        sys_response.__aenter__ = AsyncMock(return_value=sys_response)
+        sys_response.__aexit__ = AsyncMock()
+
+        ultra_response = MagicMock()
+        ultra_response.status = 200
+        ultra_response.__aenter__ = AsyncMock(return_value=ultra_response)
+        ultra_response.__aexit__ = AsyncMock()
+
+        mock_session.get = MagicMock(side_effect=[sys_response, ultra_response])
+
+        device = GeekMagicDevice("192.168.1.100", session=mock_session)
+        result = await device.detect_model()
+
+        assert result == MODEL_ULTRA
+        assert device.model == MODEL_ULTRA
 
     @pytest.mark.asyncio
     async def test_detect_model_ultra(self, mock_session):
@@ -505,3 +544,79 @@ class TestDeviceModelDetection:
         await device.reboot()
 
         mock_session.get.assert_called_with("http://192.168.1.100/set?reboot=1")
+
+
+class TestGetMac:
+    """Tests for the MAC-address probe used by the v1→v2 migration."""
+
+    def _make_response(self, *, status: int = 200, payload=None, raise_json=None):
+        response = MagicMock()
+        response.status = status
+        if raise_json is not None:
+            response.json = AsyncMock(side_effect=raise_json)
+        else:
+            response.json = AsyncMock(return_value=payload)
+        response.__aenter__ = AsyncMock(return_value=response)
+        response.__aexit__ = AsyncMock()
+        return response
+
+    @pytest.mark.asyncio
+    async def test_get_mac_from_app_json_colon_form(self):
+        """MAC returned in ``aa:bb:cc:dd:ee:ff`` form is accepted as-is."""
+        session = MagicMock()
+        session.close = AsyncMock()
+        session.get = MagicMock(
+            return_value=self._make_response(payload={"mac": "AA:BB:CC:DD:EE:FF", "brt": 50})
+        )
+
+        device = GeekMagicDevice("192.168.1.100", session=session)
+        mac = await device.get_mac()
+
+        assert mac == "aa:bb:cc:dd:ee:ff"
+
+    @pytest.mark.asyncio
+    async def test_get_mac_from_bare_hex12(self):
+        """A 12-char hex MAC is normalized into colon-separated form."""
+        session = MagicMock()
+        session.close = AsyncMock()
+        session.get = MagicMock(return_value=self._make_response(payload={"mac": "aabbccddeeff"}))
+
+        device = GeekMagicDevice("192.168.1.100", session=session)
+        assert await device.get_mac() == "aa:bb:cc:dd:ee:ff"
+
+    @pytest.mark.asyncio
+    async def test_get_mac_returns_none_when_no_field(self):
+        """No MAC-like field → fall back to None so caller uses host."""
+        session = MagicMock()
+        session.close = AsyncMock()
+        # Every probe returns the same minimal payload with no MAC field.
+        session.get = MagicMock(return_value=self._make_response(payload={"theme": 0, "brt": 50}))
+
+        device = GeekMagicDevice("192.168.1.100", session=session)
+        assert await device.get_mac() is None
+
+    @pytest.mark.asyncio
+    async def test_get_mac_rejects_garbage_strings(self):
+        """Garbage strings in a ``mac`` field are not accepted."""
+        session = MagicMock()
+        session.close = AsyncMock()
+        session.get = MagicMock(return_value=self._make_response(payload={"mac": "not-a-mac"}))
+
+        device = GeekMagicDevice("192.168.1.100", session=session)
+        assert await device.get_mac() is None
+
+    @pytest.mark.asyncio
+    async def test_get_mac_skips_non_json_responses(self):
+        """An endpoint that returns HTML (e.g. catch-all) is skipped."""
+        import aiohttp
+
+        session = MagicMock()
+        session.close = AsyncMock()
+        bad = self._make_response(
+            raise_json=aiohttp.ContentTypeError(MagicMock(), (), message="html")
+        )
+        good = self._make_response(payload={"mac": "11:22:33:44:55:66"})
+        session.get = MagicMock(side_effect=[bad, good])
+
+        device = GeekMagicDevice("192.168.1.100", session=session)
+        assert await device.get_mac() == "11:22:33:44:55:66"

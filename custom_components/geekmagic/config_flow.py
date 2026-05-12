@@ -48,7 +48,9 @@ class GeekMagicConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     All screen/widget configuration is done through entities (WLED-style).
     """
 
-    VERSION = 1
+    # VERSION 2: unique_id switched from host (IP) to MAC address. Existing
+    # v1 entries are upgraded in async_migrate_entry.
+    VERSION = 2
 
     async def async_step_user(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         """Handle the initial step - device connection."""
@@ -58,17 +60,31 @@ class GeekMagicConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             host = user_input[CONF_HOST]
             _LOGGER.debug("Config flow: attempting to configure device at %s", host)
 
-            # Check if already configured (use normalized host for uniqueness)
+            # Test connection first — we need to talk to the device to read
+            # its MAC, and a clear connection error beats a silent abort.
             session = async_get_clientsession(self.hass)
             device = GeekMagicDevice(host, session=session)
-            await self.async_set_unique_id(device.host)
-            self._abort_if_unique_id_configured()
-
-            # Test connection
             result = await device.test_connection()
 
-            if result.success:
-                _LOGGER.info("Config flow: successfully connected to %s", host)
+            if not result.success:
+                _LOGGER.warning("Config flow: failed to connect to %s: %s", host, result.message)
+                errors["base"] = result.error
+            else:
+                # Prefer the device's MAC address as the unique_id so that
+                # DHCP renumbering does not produce a duplicate entry. Fall
+                # back to the host string only when the firmware does not
+                # expose any usable MAC field — older firmware revisions.
+                mac = await device.get_mac()
+                unique_id = mac or device.host
+                _LOGGER.info(
+                    "Config flow: connected to %s, unique_id=%s (%s)",
+                    host,
+                    unique_id,
+                    "mac" if mac else "host fallback",
+                )
+
+                await self.async_set_unique_id(unique_id)
+                self._abort_if_unique_id_configured()
 
                 # Create entry with default options
                 return self.async_create_entry(
@@ -76,8 +92,6 @@ class GeekMagicConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     data=user_input,
                     options=self._get_default_options(),
                 )
-            _LOGGER.warning("Config flow: failed to connect to %s: %s", host, result.message)
-            errors["base"] = result.error
 
         return self.async_show_form(
             step_id="user",
