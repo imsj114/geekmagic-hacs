@@ -11,15 +11,60 @@ from ..const import (
 from .base import Widget, WidgetConfig
 from .components import Component, Panel
 from .data_card import DataCard
-from .helpers import get_binary_sensor_icon, translate_binary_state
+from .helpers import ON_STATES, get_binary_sensor_icon, translate_binary_state
 
 if TYPE_CHECKING:
     from ..render_context import RenderContext
-    from .state import WidgetState
+    from .state import EntityState, WidgetState
 
 
-def _get_entity_icon(entity_state) -> str | None:
-    """Get icon from entity state, handling MDI format and state-specific icons."""
+def _is_state_on(state: str | None) -> bool:
+    """Return True if state reads as 'on' (truthy / non-zero / known on-state)."""
+    if state is None:
+        return False
+    normalized = state.strip().lower()
+    if not normalized or normalized in ("unknown", "unavailable", "none"):
+        return False
+    if normalized in ON_STATES:
+        return True
+    try:
+        return float(normalized) != 0.0
+    except ValueError:
+        return False
+
+
+def _strip_mdi(icon: str | None) -> str | None:
+    """Return the icon name without an ``mdi:`` prefix."""
+    if not icon:
+        return None
+    return icon.removeprefix("mdi:")
+
+
+def _get_entity_icon(
+    entity_state: EntityState | None,
+    icon_on: str | None = None,
+    icon_off: str | None = None,
+    icon_override: str | None = None,
+) -> str | None:
+    """Resolve the icon to display for ``entity_state``.
+
+    Resolution order:
+      1. ``icon_on`` / ``icon_off`` — picked from the entity's current
+         on/off reading (truthy/non-zero/"on" → on, else off).
+      2. ``icon_override`` — explicit override regardless of state.
+      3. Binary-sensor device-class default (state-specific).
+      4. The entity's own ``icon`` attribute.
+
+    All returned values have any leading ``mdi:`` stripped.
+    """
+    if entity_state is not None:
+        per_state = icon_on if _is_state_on(entity_state.state) else icon_off
+        if per_state:
+            return _strip_mdi(per_state)
+
+    if icon_override:
+        return _strip_mdi(icon_override)
+
     if entity_state is None:
         return None
 
@@ -27,12 +72,12 @@ def _get_entity_icon(entity_state) -> str | None:
     if entity_state.entity_id.startswith("binary_sensor."):
         icon = get_binary_sensor_icon(entity_state.state, entity_state.device_class)
         if icon:
-            return icon.removeprefix("mdi:")
+            return _strip_mdi(icon)
 
     # Check explicit icon attribute
     icon = entity_state.icon
     if icon and icon.startswith("mdi:"):
-        return icon.removeprefix("mdi:")
+        return _strip_mdi(icon)
     return None
 
 
@@ -49,6 +94,8 @@ class EntityWidget(Widget):
             {"key": "show_unit", "type": "boolean", "label": "Show Unit", "default": True},
             {"key": "show_icon", "type": "boolean", "label": "Show Icon", "default": True},
             {"key": "icon", "type": "icon", "label": "Icon Override"},
+            {"key": "icon_on", "type": "icon", "label": "Icon (On State)"},
+            {"key": "icon_off", "type": "icon", "label": "Icon (Off State)"},
             {"key": "show_panel", "type": "boolean", "label": "Panel Background", "default": False},
             {
                 "key": "precision",
@@ -67,6 +114,8 @@ class EntityWidget(Widget):
         self.show_unit = config.options.get("show_unit", True)
         self.show_icon = config.options.get("show_icon", True)
         self.icon = config.options.get("icon")  # Explicit icon override
+        self.icon_on = config.options.get("icon_on")  # Per-state override (on)
+        self.icon_off = config.options.get("icon_off")  # Per-state override (off)
         self.show_panel = config.options.get("show_panel", False)
         self.precision = config.options.get("precision")  # Decimal places for numeric values
         # Attribute to read value from (instead of state)
@@ -106,10 +155,18 @@ class EntityWidget(Widget):
         # Build display value with unit
         value_text = f"{value}{unit}" if unit else value
 
-        # Determine icon to use
-        icon = self.icon
-        if not icon and self.show_icon:
-            icon = _get_entity_icon(entity)
+        # Per-state / explicit overrides display even when ``show_icon`` is
+        # False — they are opt-in by virtue of being set. Domain defaults are
+        # only used when ``show_icon`` is True.
+        if self.show_icon:
+            icon = _get_entity_icon(entity, self.icon_on, self.icon_off, self.icon)
+        else:
+            icon = None
+            if entity is not None:
+                per_state = self.icon_on if _is_state_on(entity.state) else self.icon_off
+                icon = _strip_mdi(per_state)
+            if icon is None:
+                icon = _strip_mdi(self.icon)
 
         card = DataCard(
             caption=name if self.show_name else None,

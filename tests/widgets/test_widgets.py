@@ -556,6 +556,199 @@ class TestEntityWidget:
         assert value == "Detected", f"Expected 'Detected' but got '{value}'"
 
 
+class TestEntityWidgetPerStateIcon:
+    """Tests for per-state icon overrides (``icon_on`` / ``icon_off``)."""
+
+    @staticmethod
+    def _render_icon(
+        hass,
+        renderer,
+        canvas,
+        rect,
+        entity_id: str,
+        state: str,
+        attributes: dict[str, Any],
+        options: dict[str, Any],
+    ) -> str | None:
+        """Render the widget and return the resolved DataCard icon name."""
+        from custom_components.geekmagic.widgets.data_card import DataCard
+
+        _img, draw = canvas
+        ctx = RenderContext(draw, rect, renderer)
+        hass.states.async_set(entity_id, state, attributes)
+        config = WidgetConfig(
+            widget_type="entity",
+            slot=0,
+            entity_id=entity_id,
+            options=options,
+        )
+        widget = EntityWidget(config)
+        widget_state = _build_widget_state(hass, entity_id)
+        component = widget.render(ctx, widget_state)
+        assert isinstance(component, DataCard)
+        return component.icon
+
+    def test_icon_on_used_when_entity_on(self, renderer, canvas, rect, hass):
+        """``icon_on`` is selected when the entity reads as on."""
+        icon = self._render_icon(
+            hass,
+            renderer,
+            canvas,
+            rect,
+            "binary_sensor.mailbox",
+            "on",
+            {"friendly_name": "Mailbox", "device_class": "opening"},
+            {"icon_on": "mdi:mailbox-open", "icon_off": "mdi:mailbox"},
+        )
+        assert icon == "mailbox-open"
+
+    def test_icon_off_used_when_entity_off(self, renderer, canvas, rect, hass):
+        """``icon_off`` is selected when the entity reads as off."""
+        icon = self._render_icon(
+            hass,
+            renderer,
+            canvas,
+            rect,
+            "binary_sensor.mailbox",
+            "off",
+            {"friendly_name": "Mailbox", "device_class": "opening"},
+            {"icon_on": "mdi:mailbox-open", "icon_off": "mdi:mailbox"},
+        )
+        assert icon == "mailbox"
+
+    def test_only_icon_on_set_falls_back_for_off_state(self, renderer, canvas, rect, hass):
+        """Only ``icon_on`` set: on uses override, off falls back to defaults."""
+        icon_on_state = self._render_icon(
+            hass,
+            renderer,
+            canvas,
+            rect,
+            "binary_sensor.front_door",
+            "on",
+            {"friendly_name": "Front Door", "device_class": "door"},
+            {"icon_on": "mdi:door-open"},
+        )
+        assert icon_on_state == "door-open"
+
+        icon_off_state = self._render_icon(
+            hass,
+            renderer,
+            canvas,
+            rect,
+            "binary_sensor.front_door",
+            "off",
+            {"friendly_name": "Front Door", "device_class": "door"},
+            {"icon_on": "mdi:door-open"},
+        )
+        # No icon_off set → falls back to binary-sensor device-class default.
+        assert icon_off_state is not None
+        assert icon_off_state != "door-open"
+
+    def test_falls_back_to_icon_override(self, renderer, canvas, rect, hass):
+        """With no per-state match, ``icon`` is used."""
+        icon = self._render_icon(
+            hass,
+            renderer,
+            canvas,
+            rect,
+            "sensor.temperature",
+            "23.5",
+            {"friendly_name": "Temp", "unit_of_measurement": "°C"},
+            {"icon": "mdi:thermometer-lines"},
+        )
+        assert icon == "thermometer-lines"
+
+    def test_falls_back_to_domain_default(self, renderer, canvas, rect, hass):
+        """With no overrides at all, falls back to existing default resolution."""
+        # Binary sensor with device_class=door, state=on → "Open" default icon.
+        icon = self._render_icon(
+            hass,
+            renderer,
+            canvas,
+            rect,
+            "binary_sensor.front_door",
+            "on",
+            {"friendly_name": "Front Door", "device_class": "door"},
+            {},
+        )
+        assert icon is not None
+        assert icon != ""
+
+    def test_numeric_zero_treated_as_off(self, renderer, canvas, rect, hass):
+        """Numeric ``0`` selects ``icon_off`` (non-zero/truthy → on)."""
+        icon = self._render_icon(
+            hass,
+            renderer,
+            canvas,
+            rect,
+            "sensor.count",
+            "0",
+            {"friendly_name": "Count"},
+            {"icon_on": "mdi:numeric-positive-1", "icon_off": "mdi:numeric-0"},
+        )
+        assert icon == "numeric-0"
+
+    def test_numeric_nonzero_treated_as_on(self, renderer, canvas, rect, hass):
+        """Numeric non-zero selects ``icon_on``."""
+        icon = self._render_icon(
+            hass,
+            renderer,
+            canvas,
+            rect,
+            "sensor.count",
+            "5",
+            {"friendly_name": "Count"},
+            {"icon_on": "mdi:numeric-positive-1", "icon_off": "mdi:numeric-0"},
+        )
+        assert icon == "numeric-positive-1"
+
+    def test_per_state_wins_over_icon_override(self, renderer, canvas, rect, hass):
+        """``icon_on`` is preferred over the generic ``icon`` override."""
+        icon = self._render_icon(
+            hass,
+            renderer,
+            canvas,
+            rect,
+            "binary_sensor.mailbox",
+            "on",
+            {"friendly_name": "Mailbox", "device_class": "opening"},
+            {
+                "icon": "mdi:help",
+                "icon_on": "mdi:mailbox-open",
+                "icon_off": "mdi:mailbox",
+            },
+        )
+        assert icon == "mailbox-open"
+
+    def test_overrides_show_even_when_show_icon_false(self, renderer, canvas, rect, hass):
+        """Per-state overrides are still rendered when ``show_icon`` is False."""
+        icon = self._render_icon(
+            hass,
+            renderer,
+            canvas,
+            rect,
+            "binary_sensor.mailbox",
+            "on",
+            {"friendly_name": "Mailbox", "device_class": "opening"},
+            {"show_icon": False, "icon_on": "mdi:mailbox-open"},
+        )
+        assert icon == "mailbox-open"
+
+    def test_show_icon_false_with_no_overrides_hides_icon(self, renderer, canvas, rect, hass):
+        """Defaults are suppressed when ``show_icon`` is False."""
+        icon = self._render_icon(
+            hass,
+            renderer,
+            canvas,
+            rect,
+            "binary_sensor.front_door",
+            "on",
+            {"friendly_name": "Front Door", "device_class": "door"},
+            {"show_icon": False},
+        )
+        assert icon is None
+
+
 class TestMediaWidget:
     """Tests for MediaWidget."""
 
