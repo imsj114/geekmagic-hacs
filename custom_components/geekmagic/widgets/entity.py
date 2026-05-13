@@ -66,8 +66,9 @@ class EntityWidget(Widget):
         self.show_name = config.options.get("show_name", True)
         self.show_unit = config.options.get("show_unit", True)
         self.show_icon = config.options.get("show_icon", True)
-        # Treat empty string (cleared icon picker) the same as missing.
-        self.icon = config.options.get("icon") or None  # Explicit icon override
+        # Explicit icon override. Treat empty string (cleared picker) as
+        # missing so the help-circle fallback glyph never appears.
+        self.icon = config.options.get("icon") or None
         self.show_panel = config.options.get("show_panel", False)
         self.precision = config.options.get("precision")  # Decimal places for numeric values
         # Attribute to read value from (instead of state)

@@ -941,6 +941,12 @@ class TestGaugeWidget:
         assert img.size == (480, 480)
 
 
+# Sentinel for "options key not present" — distinct from ``None`` so the
+# test below can prove that "missing key", ``None``, and ``""`` all render
+# identically.
+_ICON_MISSING: Any = object()
+
+
 class TestIconClearedFallback:
     """Regression tests for issue #125: clearing the icon picker must not
     render the help-circle fallback glyph.
@@ -1035,10 +1041,6 @@ class TestIconClearedFallback:
         # Pixel-identical renders prove the help-circle glyph never appears.
         assert ImageChops.difference(img_empty, img_none).getbbox() is None
         assert ImageChops.difference(img_empty, img_missing).getbbox() is None
-
-
-# Sentinel for "key not present in options" in the test above.
-_ICON_MISSING: Any = object()
 
 
 class TestProgressWidget:
