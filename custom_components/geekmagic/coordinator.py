@@ -9,8 +9,6 @@ from typing import TYPE_CHECKING, Any
 
 from homeassistant.const import __version__ as ha_version
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers.aiohttp_client import async_get_clientsession
-from homeassistant.helpers.network import NoURLAvailableError, get_url
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .connection_backoff import ConnectionBackoff
@@ -29,9 +27,10 @@ from .const import (
     MODEL_PRO,
 )
 from .device import DeviceState, GeekMagicDevice, SpaceInfo
-from .history_fetcher import HistoryFetcher, extract_numeric_values
+from .history_fetcher import extract_numeric_values
 from .layouts.hero import HeroLayout
 from .notification_manager import NotificationManager
+from .render_data_pipeline import RenderDataPipeline
 from .renderer import Renderer
 from .screen_builder import (
     CONF_ASSIGNED_VIEWS,
@@ -42,14 +41,9 @@ from .screen_builder import (
 )
 from .widget_state_builder import PrefetchedData, build_widget_states
 from .widgets.base import WidgetConfig
-from .widgets.camera import CameraWidget
-from .widgets.candlestick import CandlestickWidget
-from .widgets.chart import ChartWidget
 from .widgets.clock import ClockWidget
-from .widgets.media import MediaWidget
 from .widgets.state import WidgetState
 from .widgets.text import TextWidget
-from .widgets.weather import WeatherWidget
 
 if TYPE_CHECKING:
     from .layouts.base import Layout
@@ -97,11 +91,11 @@ class GeekMagicCoordinator(DataUpdateCoordinator):
         self._last_update_success: bool = False
         self._last_update_time: float | None = None
         self.config_entry = config_entry
-        self._camera_images: dict[str, bytes] = {}  # Pre-fetched camera images
-        self._media_images: dict[str, bytes] = {}  # Pre-fetched media player album art
-        self._chart_history: dict[str, list[float]] = {}  # Pre-fetched chart history
-        self._candlestick_data: dict[str, list[tuple[float, float, float, float]]] = {}
-        self._weather_forecasts: dict[str, list[dict[str, Any]]] = {}  # Pre-fetched forecasts
+        self._pipeline = RenderDataPipeline(hass)
+        # Last bundle produced by the pipeline — consulted by _render_display
+        # (in the executor) and by `_build_widget_states`. Set on every
+        # successful update before render.
+        self._prefetched: PrefetchedData = PrefetchedData()
         self._update_preview: bool = True  # Update preview on next refresh
         self._preview_just_updated: bool = False  # True if preview was updated in last refresh
 
@@ -306,17 +300,7 @@ class GeekMagicCoordinator(DataUpdateCoordinator):
 
     def _build_widget_states(self, layout: Layout) -> dict[int, WidgetState]:
         """Build WidgetState for every populated slot in `layout`."""
-        return build_widget_states(
-            layout,
-            self.hass,
-            PrefetchedData(
-                camera_images=self._camera_images,
-                media_images=self._media_images,
-                chart_history=self._chart_history,
-                candlestick_data=self._candlestick_data,
-                weather_forecasts=self._weather_forecasts,
-            ),
-        )
+        return build_widget_states(layout, self.hass, self._prefetched)
 
     def _render_display(self) -> tuple[bytes, bytes]:
         """Render the display image (runs in executor thread).
@@ -489,11 +473,11 @@ class GeekMagicCoordinator(DataUpdateCoordinator):
 
             # Pre-fetch async data (camera images, media art, chart history, weather forecasts)
             # (must be done in async context)
-            await self._async_fetch_camera_images()
-            await self._async_fetch_media_images()
-            await self._async_fetch_chart_history()
-            await self._async_fetch_candlestick_history()
-            await self._async_fetch_weather_forecasts()
+            if self._layouts and 0 <= self._current_screen < len(self._layouts):
+                self._prefetched = await self._pipeline.prefetch(
+                    self._layouts[self._current_screen],
+                    image_source=self._notifications.image_source,
+                )
 
             # Render image in executor to avoid blocking the event loop
             # (Pillow image operations are CPU-intensive)
@@ -711,268 +695,3 @@ class GeekMagicCoordinator(DataUpdateCoordinator):
         self._setup_screens()
         self._update_preview = True
         await self.async_request_refresh()
-
-    async def _async_fetch_camera_images(self) -> None:
-        """Pre-fetch camera images for all camera widgets.
-
-        This must be called from the async context before rendering,
-        since camera.async_get_image() is async.
-        """
-        from homeassistant.components.camera import async_get_image
-
-        # Find all camera/image widgets in current layout
-        camera_entity_ids: set[str] = set()
-        other_entity_ids: set[str] = set()
-
-        if self._layouts and 0 <= self._current_screen < len(self._layouts):
-            layout = self._layouts[self._current_screen]
-            for slot in layout.slots:
-                if slot.widget and isinstance(slot.widget, CameraWidget):
-                    entity_id = slot.widget.config.entity_id
-                    if entity_id:
-                        if entity_id.startswith("camera."):
-                            camera_entity_ids.add(entity_id)
-                        else:
-                            other_entity_ids.add(entity_id)
-
-        # Also collect entities from notification
-        image_source = self._notifications.image_source
-        if image_source:
-            if image_source.startswith("camera."):
-                camera_entity_ids.add(image_source)
-            else:
-                other_entity_ids.add(image_source)
-
-        # Fetch non-camera entities first (they populate the same cache)
-        for entity_id in other_entity_ids:
-            await self._async_fetch_url_image_to_cache(entity_id)
-
-        # Fetch images for each camera
-        for entity_id in camera_entity_ids:
-            try:
-                image = await async_get_image(self.hass, entity_id)
-                if image and image.content:
-                    self._camera_images[entity_id] = image.content
-                    _LOGGER.debug(
-                        "Fetched camera image for %s: %d bytes",
-                        entity_id,
-                        len(image.content),
-                    )
-            except Exception as e:
-                _LOGGER.debug("Failed to fetch camera image for %s: %s", entity_id, e)
-
-    async def _async_fetch_url_image_to_cache(self, source: str) -> None:
-        """Fetch image from entity_picture and save to camera image cache.
-
-        Args:
-            source: Entity ID
-        """
-        # Get state for the entity
-        image_url = None
-        state = self.hass.states.get(source)
-        if state:
-            image_url = state.attributes.get("entity_picture")
-
-        # Only allow internal Home Assistant URLs (starting with /)
-        if not image_url or not image_url.startswith("/"):
-            return
-
-        try:
-            base_url = get_url(self.hass)
-        except NoURLAvailableError:
-            _LOGGER.debug("No base URL available for entity picture fetch")
-            return
-
-        # Ensure base_url doesn't have trailing slash and image_url has leading slash
-        full_url = f"{base_url.rstrip('/')}/{image_url.lstrip('/')}"
-
-        try:
-            # Use Home Assistant's managed session for proper SSL/auth handling
-            session = async_get_clientsession(self.hass)
-            async with session.get(full_url, timeout=10) as response:
-                if response.status == 200:
-                    image_data = await response.read()
-                    self._camera_images[source] = image_data
-                    _LOGGER.debug(
-                        "Fetched image for notification from %s: %d bytes",
-                        source,
-                        len(image_data),
-                    )
-                else:
-                    _LOGGER.debug(
-                        "Failed to fetch notification image from %s: HTTP %d",
-                        source,
-                        response.status,
-                    )
-        except Exception as e:
-            _LOGGER.debug("Failed to fetch notification image from %s: %s", source, e)
-
-    def get_camera_image(self, entity_id: str) -> bytes | None:
-        """Get pre-fetched camera image.
-
-        Args:
-            entity_id: Camera entity ID
-
-        Returns:
-            Image bytes or None if not available
-        """
-        return self._camera_images.get(entity_id)
-
-    async def _async_fetch_media_images(self) -> None:
-        """Pre-fetch album art images for all media player widgets.
-
-        Fetches entity_picture URLs from media player entities and downloads
-        the album art images for display.
-        """
-        # Find all media widgets in current layout
-        media_entity_ids: set[str] = set()
-
-        if self._layouts and 0 <= self._current_screen < len(self._layouts):
-            layout = self._layouts[self._current_screen]
-            for slot in layout.slots:
-                if slot.widget and isinstance(slot.widget, MediaWidget):
-                    entity_id = slot.widget.config.entity_id
-                    if entity_id:
-                        media_entity_ids.add(entity_id)
-
-        if not media_entity_ids:
-            return
-
-        # Fetch album art for each media player
-        for entity_id in media_entity_ids:
-            state = self.hass.states.get(entity_id)
-            if state is None:
-                continue
-
-            # Get entity_picture from attributes
-            entity_picture = state.attributes.get("entity_picture")
-            if not entity_picture or not entity_picture.startswith("/"):
-                # Clear any cached image if no internal picture available
-                self._media_images.pop(entity_id, None)
-                continue
-
-            try:
-                base_url = get_url(self.hass)
-            except NoURLAvailableError:
-                continue
-
-            # Ensure base_url doesn't have trailing slash and entity_picture has leading slash
-            image_url = f"{base_url.rstrip('/')}/{entity_picture.lstrip('/')}"
-
-            try:
-                # Use Home Assistant's managed session so media proxy requests
-                # carry the right auth/cookies.
-                session = async_get_clientsession(self.hass)
-                async with session.get(image_url, timeout=10) as response:
-                    if response.status == 200:
-                        image_data = await response.read()
-                        self._media_images[entity_id] = image_data
-                        _LOGGER.debug(
-                            "Fetched album art for %s: %d bytes",
-                            entity_id,
-                            len(image_data),
-                        )
-                    else:
-                        _LOGGER.debug(
-                            "Failed to fetch album art for %s: HTTP %d",
-                            entity_id,
-                            response.status,
-                        )
-            except Exception as e:
-                _LOGGER.debug("Failed to fetch album art for %s: %s", entity_id, e)
-
-    async def _async_fetch_chart_history(self) -> None:
-        """Pre-fetch numeric history for all chart widgets on the active screen."""
-        chart_widgets: list[tuple[str, ChartWidget]] = []
-        if self._layouts and 0 <= self._current_screen < len(self._layouts):
-            for slot in self._layouts[self._current_screen].slots:
-                if slot.widget and isinstance(slot.widget, ChartWidget):
-                    entity_id = slot.widget.config.entity_id
-                    if entity_id:
-                        chart_widgets.append((entity_id, slot.widget))
-
-        if not chart_widgets:
-            return
-
-        fetcher = HistoryFetcher(self.hass)
-        if not fetcher.available:
-            return
-
-        for entity_id, widget in chart_widgets:
-            values = await fetcher.fetch_numeric(entity_id, widget.hours)
-            if values:
-                self._chart_history[entity_id] = values
-                _LOGGER.debug("Fetched %d history points for %s", len(values), entity_id)
-
-    async def _async_fetch_candlestick_history(self) -> None:
-        """Pre-fetch and aggregate OHLC data for all candlestick widgets."""
-        candlestick_widgets: list[tuple[str, CandlestickWidget]] = []
-        if self._layouts and 0 <= self._current_screen < len(self._layouts):
-            for slot in self._layouts[self._current_screen].slots:
-                if slot.widget and isinstance(slot.widget, CandlestickWidget):
-                    entity_id = slot.widget.config.entity_id
-                    if entity_id:
-                        candlestick_widgets.append((entity_id, slot.widget))
-
-        if not candlestick_widgets:
-            return
-
-        fetcher = HistoryFetcher(self.hass)
-        if not fetcher.available:
-            return
-
-        for entity_id, widget in candlestick_widgets:
-            candles = await fetcher.fetch_ohlc(
-                entity_id, widget.hours, widget.interval_seconds, widget.candle_count
-            )
-            if candles:
-                self._candlestick_data[entity_id] = candles
-                _LOGGER.debug("Aggregated %d candles for %s", len(candles), entity_id)
-
-    async def _async_fetch_weather_forecasts(self) -> None:
-        """Pre-fetch forecast data for all weather widgets.
-
-        This must be called from the async context before rendering,
-        since weather.get_forecasts is a service call that requires async.
-
-        Uses the weather.get_forecasts service introduced in Home Assistant 2023.9,
-        since the forecast attribute was removed from weather entities in 2024.3.
-        """
-        # Find all weather widgets in current layout
-        weather_entity_ids: set[str] = set()
-
-        if self._layouts and 0 <= self._current_screen < len(self._layouts):
-            layout = self._layouts[self._current_screen]
-            for slot in layout.slots:
-                if slot.widget and isinstance(slot.widget, WeatherWidget):
-                    entity_id = slot.widget.config.entity_id
-                    if entity_id:
-                        weather_entity_ids.add(entity_id)
-
-        if not weather_entity_ids:
-            return
-
-        # Fetch forecast for each weather entity
-        for entity_id in weather_entity_ids:
-            try:
-                # Use daily forecast type (most common for weather displays)
-                response = await self.hass.services.async_call(
-                    "weather",
-                    "get_forecasts",
-                    {"type": "daily"},
-                    target={"entity_id": entity_id},
-                    blocking=True,
-                    return_response=True,
-                )
-
-                forecast_response = response.get(entity_id) if isinstance(response, dict) else None
-                if isinstance(forecast_response, dict):
-                    forecast = forecast_response.get("forecast", [])
-                    self._weather_forecasts[entity_id] = forecast
-                    _LOGGER.debug(
-                        "Fetched %d forecast days for %s",
-                        len(forecast),
-                        entity_id,
-                    )
-            except Exception as e:
-                _LOGGER.debug("Failed to fetch forecast for %s: %s", entity_id, e)
