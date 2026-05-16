@@ -7,9 +7,6 @@ import time
 from datetime import timedelta
 from typing import TYPE_CHECKING, Any
 
-if TYPE_CHECKING:
-    import asyncio
-
 from homeassistant.const import __version__ as ha_version
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
@@ -30,13 +27,11 @@ from .const import (
     DOMAIN,
     MAX_BACKOFF_MULTIPLIER,
     MODEL_PRO,
-    THEME_WATCHOS,
 )
 from .device import DeviceState, GeekMagicDevice, SpaceInfo
 from .history_fetcher import HistoryFetcher, extract_numeric_values
-from .layouts.fullscreen import FullscreenLayout
 from .layouts.hero import HeroLayout
-from .layouts.hero_simple import HeroSimpleLayout
+from .notification_manager import NotificationManager
 from .renderer import Renderer
 from .screen_builder import (
     CONF_ASSIGNED_VIEWS,
@@ -51,11 +46,9 @@ from .widgets.camera import CameraWidget
 from .widgets.candlestick import CandlestickWidget
 from .widgets.chart import ChartWidget
 from .widgets.clock import ClockWidget
-from .widgets.icon import IconWidget
 from .widgets.media import MediaWidget
 from .widgets.state import WidgetState
 from .widgets.text import TextWidget
-from .widgets.theme import get_theme
 from .widgets.weather import WeatherWidget
 
 if TYPE_CHECKING:
@@ -119,10 +112,8 @@ class GeekMagicCoordinator(DataUpdateCoordinator):
         self._last_brightness_poll: float = 0  # Timestamp of last brightness poll
         self._brightness_poll_interval: float = 600  # 10 minutes
 
-        # Notification state
-        self._notification_expiry: float = 0
-        self._notification_data: dict[str, Any] | None = None
-        self._notification_clear_handle: asyncio.TimerHandle | None = None
+        # Notification subsystem (trigger / expiry / layout override)
+        self._notifications = NotificationManager(hass, self.async_request_refresh)
 
         # Display mode tracking
         # "custom" = integration renders views, "builtin" = device shows built-in mode
@@ -348,9 +339,10 @@ class GeekMagicCoordinator(DataUpdateCoordinator):
             layout = self._layouts[self._current_screen]
 
             # Check for active notification
-            if time.time() < self._notification_expiry and self._notification_data:
+            override = self._notifications.build_layout()
+            if override is not None:
                 _LOGGER.debug("Rendering active notification")
-                layout = self._create_notification_layout(self._notification_data)
+                layout = override
 
             _LOGGER.debug(
                 "Rendering layout %s with %d widgets",
@@ -377,135 +369,8 @@ class GeekMagicCoordinator(DataUpdateCoordinator):
         return jpeg_data, png_data
 
     async def trigger_notification(self, data: dict[str, Any]) -> None:
-        """Trigger a notification on this device.
-
-        Args:
-            data: Notification data (message, title, icon, duration, etc.)
-        """
-        duration = data.get("duration", 10)
-        self._notification_data = data
-        self._notification_expiry = time.time() + duration
-
-        # Cancel any pending clear callback to prevent race conditions
-        if self._notification_clear_handle is not None:
-            self._notification_clear_handle.cancel()
-
-        # Schedule cleanup and store handle for potential cancellation
-        self._notification_clear_handle = self.hass.loop.call_later(
-            duration, self._clear_notification
-        )
-
-        # Force immediate refresh
-        await self.async_request_refresh()
-
-    def _clear_notification(self) -> None:
-        """Clear the active notification and refresh."""
-        self._notification_expiry = 0
-        self._notification_data = None
-        self._notification_clear_handle = None
-        # Use fire-and-forget for the refresh since this is a callback
-        self.hass.async_create_task(self.async_request_refresh())
-
-    def _create_notification_layout(self, data: dict[str, Any]) -> Layout:
-        """Create a layout for a notification.
-
-        Args:
-            data: Notification data
-
-        Returns:
-            Layout: HeroSimpleLayout (with message) or FullscreenLayout (image only)
-        """
-        message = data.get("message")
-
-        # Scenario 1: No message -> Fullscreen Layout (Image/Icon only)
-        if not message:
-            layout = FullscreenLayout()
-            # Apply theme if specified
-            theme_name = data.get("theme", THEME_WATCHOS)
-            layout.theme = get_theme(theme_name)
-
-            hero_widget = None
-            image_url = data.get("image")
-
-            if image_url:
-                hero_widget = CameraWidget(
-                    WidgetConfig(
-                        widget_type="camera",
-                        slot=0,
-                        entity_id=image_url,
-                        options={
-                            # contain ensures full image visible, cover fills screen
-                            "fit": "contain",
-                        },
-                    )
-                )
-
-            if not hero_widget:
-                # Default to Icon — IconWidget falls back to the active
-                # theme's accent color (matches whatever theme the user
-                # picked for the notification).
-                icon = data.get("icon", "mdi:bell-ring")
-                hero_widget = IconWidget(
-                    WidgetConfig(
-                        widget_type="icon",
-                        slot=0,
-                        options={
-                            "icon": icon,
-                            "size": "huge",  # This option is now supported by IconWidget
-                            "show_panel": False,  # Clean fullscreen look
-                        },
-                    )
-                )
-            layout.set_widget(0, hero_widget)
-            return layout
-
-        # Scenario 2: Message exists -> Hero Simple Layout
-        layout = HeroSimpleLayout()
-
-        # Apply theme if specified
-        theme_name = data.get("theme", THEME_WATCHOS)
-        layout.theme = get_theme(theme_name)
-
-        # Slot 0 (Hero): Icon or Image
-        hero_widget = None
-        image_url = data.get("image")
-        if image_url:
-            hero_widget = CameraWidget(
-                WidgetConfig(
-                    widget_type="camera", slot=0, entity_id=image_url, options={"fit": "contain"}
-                )
-            )
-
-        if not hero_widget:
-            # Default to Icon — falls back to the active theme's accent color.
-            icon = data.get("icon", "mdi:bell-ring")
-            hero_widget = IconWidget(
-                WidgetConfig(
-                    widget_type="icon",
-                    slot=0,
-                    options={
-                        "icon": icon,
-                        "size": "huge",  # Force huge icon
-                    },
-                )
-            )
-        layout.set_widget(0, hero_widget)
-
-        # Slot 1 (Footer): Message — defaults to theme.text_primary.
-        text_widget = TextWidget(
-            WidgetConfig(
-                widget_type="text",
-                slot=1,
-                options={
-                    "text": message,
-                    "size": "medium",
-                    "align": "center",
-                },
-            )
-        )
-        layout.set_widget(1, text_widget)
-
-        return layout
+        """Show a notification on this device. Delegates to NotificationManager."""
+        await self._notifications.trigger(data)
 
     async def _async_update_data(self) -> dict[str, Any]:
         """Fetch data and update display.
@@ -871,13 +736,12 @@ class GeekMagicCoordinator(DataUpdateCoordinator):
                             other_entity_ids.add(entity_id)
 
         # Also collect entities from notification
-        if self._notification_data:
-            image_source = self._notification_data.get("image")
-            if image_source:
-                if image_source.startswith("camera."):
-                    camera_entity_ids.add(image_source)
-                else:
-                    other_entity_ids.add(image_source)
+        image_source = self._notifications.image_source
+        if image_source:
+            if image_source.startswith("camera."):
+                camera_entity_ids.add(image_source)
+            else:
+                other_entity_ids.add(image_source)
 
         # Fetch non-camera entities first (they populate the same cache)
         for entity_id in other_entity_ids:
