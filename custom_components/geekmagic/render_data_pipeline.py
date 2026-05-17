@@ -15,6 +15,7 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING, Any
 
+from aiohttp import ClientTimeout
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.network import NoURLAvailableError, get_url
 
@@ -32,6 +33,10 @@ if TYPE_CHECKING:
     from .layouts.base import Layout
 
 _LOGGER = logging.getLogger(__name__)
+
+# 10s upper bound on any single image download — keeps a slow camera or
+# stalled media-proxy connection from blocking the whole pre-fetch step.
+_IMAGE_FETCH_TIMEOUT = ClientTimeout(total=10)
 
 
 class RenderDataPipeline:
@@ -137,7 +142,7 @@ class RenderDataPipeline:
         full_url = f"{base_url.rstrip('/')}/{image_url.lstrip('/')}"
         session = async_get_clientsession(self._hass)
         try:
-            async with session.get(full_url, timeout=10) as response:
+            async with session.get(full_url, timeout=_IMAGE_FETCH_TIMEOUT) as response:
                 if response.status == 200:
                     image_data = await response.read()
                     self._camera_images[source] = image_data
@@ -182,7 +187,7 @@ class RenderDataPipeline:
             image_url = f"{base_url.rstrip('/')}/{entity_picture.lstrip('/')}"
             session = async_get_clientsession(self._hass)
             try:
-                async with session.get(image_url, timeout=10) as response:
+                async with session.get(image_url, timeout=_IMAGE_FETCH_TIMEOUT) as response:
                     if response.status == 200:
                         image_data = await response.read()
                         self._media_images[entity_id] = image_data
@@ -271,7 +276,14 @@ class RenderDataPipeline:
                 continue
 
             forecast_response = response.get(entity_id) if isinstance(response, dict) else None
-            if isinstance(forecast_response, dict):
-                forecast = forecast_response.get("forecast", [])
-                self._weather_forecasts[entity_id] = forecast
-                _LOGGER.debug("Fetched %d forecast days for %s", len(forecast), entity_id)
+            if not isinstance(forecast_response, dict):
+                continue
+            raw_forecast = forecast_response.get("forecast", [])
+            # Coerce to list[dict] — HA's response is typed as JsonValueType.
+            # We trust the documented shape but defend against an unexpected
+            # one rather than letting a stray int/str poison the cache.
+            if not isinstance(raw_forecast, list):
+                continue
+            forecast: list[dict[str, Any]] = [d for d in raw_forecast if isinstance(d, dict)]
+            self._weather_forecasts[entity_id] = forecast
+            _LOGGER.debug("Fetched %d forecast days for %s", len(forecast), entity_id)

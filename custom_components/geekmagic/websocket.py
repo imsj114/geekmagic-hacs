@@ -465,7 +465,11 @@ async def ws_preview_render(
                         response.get(entity_id) if isinstance(response, dict) else None
                     )
                     if isinstance(forecast_response, dict):
-                        weather_forecasts[entity_id] = forecast_response.get("forecast", [])
+                        raw = forecast_response.get("forecast", [])
+                        if isinstance(raw, list):
+                            weather_forecasts[entity_id] = [
+                                d for d in raw if isinstance(d, dict)
+                            ]
                 except Exception as err:
                     _LOGGER.debug("Failed to fetch forecast for %s: %s", entity_id, err)
 
