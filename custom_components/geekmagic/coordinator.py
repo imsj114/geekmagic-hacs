@@ -578,10 +578,7 @@ class GeekMagicCoordinator(DataUpdateCoordinator):
             Dict mapping slot index to WidgetState
         """
         from datetime import UTC
-        from io import BytesIO
         from zoneinfo import ZoneInfo
-
-        from PIL import Image
 
         states: dict[int, WidgetState] = {}
 
@@ -632,13 +629,13 @@ class GeekMagicCoordinator(DataUpdateCoordinator):
             if isinstance(widget, CameraWidget) and widget.config.entity_id:
                 image_bytes = self._camera_images.get(widget.config.entity_id)
                 if image_bytes:
-                    with contextlib.suppress(Exception):
-                        image = Image.open(BytesIO(image_bytes))
+                    image = self._decode_cached_image(
+                        widget.config.entity_id, image_bytes, "camera"
+                    )
             elif isinstance(widget, MediaWidget) and widget.config.entity_id:
                 image_bytes = self._media_images.get(widget.config.entity_id)
                 if image_bytes:
-                    with contextlib.suppress(Exception):
-                        image = Image.open(BytesIO(image_bytes))
+                    image = self._decode_cached_image(widget.config.entity_id, image_bytes, "media")
 
             # Get pre-fetched weather forecast
             forecast: list[dict[str, Any]] = []
@@ -1492,6 +1489,36 @@ class GeekMagicCoordinator(DataUpdateCoordinator):
             url,
             reason,
         )
+
+    def _decode_cached_image(self, entity_id: str, image_bytes: bytes, kind: str):
+        """Decode pre-fetched image bytes for an entity; log+evict on failure.
+
+        ``Image.open`` is lazy and only reads the header — the actual decode
+        happens later (e.g. in widget render code) where there is no logging
+        hook and a corrupt image silently downgrades to a text fallback.
+        Calling ``.load()`` here forces the decode so errors surface where we
+        can log them and drop the bad bytes from the cache.
+        """
+        from io import BytesIO
+
+        from PIL import Image
+
+        cache = self._media_images if kind == "media" else self._camera_images
+        try:
+            decoded = Image.open(BytesIO(image_bytes))
+            decoded.load()
+        except Exception as e:
+            _LOGGER.warning(
+                "Failed to decode %s image for %s (%d bytes): %s",
+                kind,
+                entity_id,
+                len(image_bytes),
+                e,
+            )
+            cache.pop(entity_id, None)
+            return None
+        else:
+            return decoded
 
     def _fetch_entity_history(self, entity_id: str, start: datetime, end: datetime) -> list:
         """Fetch history for an entity (sync, runs in executor).
