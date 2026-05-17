@@ -940,6 +940,69 @@ class TestGaugeWidget:
         widget.render(ctx, state)
         assert img.size == (480, 480)
 
+    def test_defaults_show_name_and_show_unit(self):
+        """show_name / show_unit default to True (parity with EntityWidget)."""
+        config = WidgetConfig(widget_type="gauge", slot=0, entity_id="sensor.cpu")
+        widget = GaugeWidget(config)
+        assert widget.show_name is True
+        assert widget.show_unit is True
+
+    def test_show_name_false_drops_caption(self, renderer, canvas, rect, hass):
+        """When show_name=False, the BarGauge label is empty so DataCard
+        drops the caption band entirely (no friendly_name fallback)."""
+        _img, draw = canvas
+        ctx = RenderContext(draw, rect, renderer)
+        hass.states.async_set("sensor.cpu", "75", {"friendly_name": "CPU Usage"})
+
+        config = WidgetConfig(
+            widget_type="gauge",
+            slot=0,
+            entity_id="sensor.cpu",
+            options={"show_name": False},
+        )
+        widget = GaugeWidget(config)
+        state = _build_widget_state(hass, "sensor.cpu")
+        component = widget.render(ctx, state)
+        from custom_components.geekmagic.widgets.component_helpers import BarGauge
+
+        assert isinstance(component, BarGauge)
+        assert component.label == ""
+
+    def test_show_unit_false_strips_entity_unit(self, renderer, canvas, rect, hass):
+        """show_unit=False suppresses both the unit override and the
+        entity's native unit (issue #125 — no way to hide ``%``)."""
+        _img, draw = canvas
+        ctx = RenderContext(draw, rect, renderer)
+        hass.states.async_set(
+            "sensor.cpu",
+            "75",
+            {"friendly_name": "CPU", "unit_of_measurement": "%"},
+        )
+
+        config = WidgetConfig(
+            widget_type="gauge",
+            slot=0,
+            entity_id="sensor.cpu",
+            options={"show_unit": False},
+        )
+        widget = GaugeWidget(config)
+        state = _build_widget_state(hass, "sensor.cpu")
+        component = widget.render(ctx, state)
+        assert component.value == "75"  # no trailing "%"
+
+    def test_cleared_icon_normalises_to_none(self):
+        """ha-icon-picker writes ``""`` when cleared — the gauge widget
+        normalises that to ``None`` so DataCard doesn't render
+        ``help-circle`` as a placeholder (issue #125)."""
+        config = WidgetConfig(
+            widget_type="gauge",
+            slot=0,
+            entity_id="sensor.cpu",
+            options={"icon": ""},
+        )
+        widget = GaugeWidget(config)
+        assert widget.icon is None
+
 
 class TestProgressWidget:
     """Tests for ProgressWidget."""
