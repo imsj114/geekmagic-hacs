@@ -31,15 +31,16 @@ BASE_URL = f"http://{DEVICE_HOST}"
 
 
 def _mock_device_success(aioclient_mock, host: str = DEVICE_HOST):
-    """Mock HTTP endpoints for a successful device connection."""
+    """Mock HTTP endpoints for a successful device connection (stock Ultra)."""
     base = f"http://{host}"
-    # test_connection calls get_space
+    # Firmware identification — drives detect_driver
+    aioclient_mock.get(f"{base}/v.json", json={"m": "SmallTV-Ultra", "v": "Ultra-V9.0.40"})
+    # Connection probe and storage info
     aioclient_mock.get(f"{base}/space.json", json={"total": 1048576, "free": 524288})
-    # Model detection
-    aioclient_mock.get(f"{base}/.sys/app.json", status=404)
+    # Device state, brightness
     aioclient_mock.get(f"{base}/app.json", json={"theme": 0, "brt": 50, "img": None})
-    # Brightness, upload, set commands (for full setup after entry creation)
     aioclient_mock.get(f"{base}/brt.json", json={"brt": "50"})
+    # Upload + /set?... commands (for full setup after entry creation)
     aioclient_mock.post(f"{base}/doUpload?dir=/image/", status=200)
     aioclient_mock.get(re.compile(rf"^{re.escape(base)}/set\?"), status=200)
 
@@ -77,7 +78,7 @@ class TestConfigFlowUser:
     async def test_user_flow_connection_timeout(self, hass: HomeAssistant, aioclient_mock):
         """Test user flow shows timeout error when device times out."""
         aioclient_mock.get(
-            f"{BASE_URL}/space.json",
+            f"{BASE_URL}/v.json",
             exc=TimeoutError("Connection timed out"),
         )
 
@@ -93,7 +94,7 @@ class TestConfigFlowUser:
     async def test_user_flow_connection_refused(self, hass: HomeAssistant, aioclient_mock):
         """Test user flow shows connection refused error."""
         aioclient_mock.get(
-            f"{BASE_URL}/space.json",
+            f"{BASE_URL}/v.json",
             exc=OSError("Connection refused"),
         )
 
