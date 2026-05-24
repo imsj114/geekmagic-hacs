@@ -127,6 +127,49 @@ class SDProDriver(DeviceDriver):
         await self._ensure_only_photo_enabled(name)
         await self._ensure_photo_theme()
 
+    async def list_themes(self) -> list[dict]:
+        """Return the device's built-in theme list.
+
+        Each entry has `{id: int, name: str, enabled: bool}`. Used by the
+        config flow to show the user which themes will be disabled.
+        """
+        async with self._session.get(f"{self.base_url}/theme/list") as r:
+            r.raise_for_status()
+            data = await r.json(content_type=None)
+            return list(data.get("themes", []))
+
+    async def disable_other_themes(self) -> list[str]:
+        """Disable every built-in theme except Photo (the integration's slot).
+
+        Returns the list of theme names that were toggled off, so the caller
+        can confirm to the user what changed. Idempotent — themes already
+        disabled are left alone.
+        """
+        disabled: list[str] = []
+        try:
+            themes = await self.list_themes()
+        except Exception as err:
+            _LOGGER.warning("SD_PRO /theme/list failed: %s", err)
+            return disabled
+        for theme in themes:
+            theme_id = theme.get("id")
+            if theme_id is None or int(theme_id) == self.custom_image_theme:
+                continue
+            if not theme.get("enabled"):
+                continue
+            try:
+                await self._theme_toggle(int(theme_id), False)
+                disabled.append(str(theme.get("name", f"theme {theme_id}")))
+            except Exception as err:
+                _LOGGER.debug("SD_PRO disable theme %s failed: %s", theme_id, err)
+        return disabled
+
+    async def _theme_toggle(self, theme_id: int, enabled: bool) -> None:
+        state = 1 if enabled else 0
+        url = f"{self.base_url}/theme/toggle?id={theme_id}&state={state}"
+        async with self._session.get(url) as r:
+            r.raise_for_status()
+
     async def _ensure_only_photo_enabled(self, keep_name: str) -> None:
         try:
             async with self._session.get(f"{self.base_url}/photo/list") as r:

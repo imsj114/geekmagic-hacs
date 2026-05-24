@@ -157,6 +157,27 @@ class GeekMagicDevice:
     async def navigate_enter(self) -> None:
         await self.driver.navigate_enter()
 
+    async def list_themes(self) -> list[dict]:
+        """Return the device's built-in themes (SD_PRO only)."""
+        driver = self.driver
+        if not hasattr(driver, "list_themes"):
+            return []
+        return await driver.list_themes()
+
+    async def disable_other_themes(self) -> list[str]:
+        """Disable every built-in theme except the one we render into.
+
+        Currently only meaningful for SD_PRO firmware, whose device-side
+        theme rotation would otherwise switch away from the integration's
+        rendered photo. Returns the list of disabled theme names; an empty
+        list means nothing needed changing (or the firmware doesn't support
+        this concept).
+        """
+        driver = self.driver
+        if not hasattr(driver, "disable_other_themes"):
+            return []
+        return await driver.disable_other_themes()
+
     async def test_connection(self) -> ConnectionResult:  # noqa: PLR0911
         """Confirm the device is reachable and pick its firmware driver.
 

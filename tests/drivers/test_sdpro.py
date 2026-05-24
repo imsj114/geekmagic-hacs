@@ -222,6 +222,62 @@ async def test_reboot_swallows_connection_drop(driver, session):
 
 
 @pytest.mark.asyncio
+async def test_list_themes(driver, session):
+    session.queue_get(
+        "/theme/list",
+        json={
+            "interval": 10,
+            "themes": [
+                {"id": 0, "name": "Classic", "enabled": True},
+                {"id": 1, "name": "Weather", "enabled": False},
+                {"id": 2, "name": "Photo", "enabled": True},
+            ],
+        },
+    )
+    themes = await driver.list_themes()
+    assert len(themes) == 3
+    assert themes[0]["name"] == "Classic"
+
+
+@pytest.mark.asyncio
+async def test_disable_other_themes(driver, session):
+    session.queue_get(
+        "/theme/list",
+        json={
+            "themes": [
+                {"id": 0, "name": "Classic", "enabled": True},
+                {"id": 1, "name": "Weather", "enabled": True},
+                {"id": 2, "name": "Photo", "enabled": True},
+                {"id": 3, "name": "Dial", "enabled": False},
+            ],
+        },
+    )
+
+    disabled = await driver.disable_other_themes()
+
+    # Photo (id=2, custom_image_theme) is kept enabled; Dial was already off
+    assert sorted(disabled) == ["Classic", "Weather"]
+    # Verify the toggle calls were the right ones
+    assert any("/theme/toggle?id=0&state=0" in url for url in session.get_log)
+    assert any("/theme/toggle?id=1&state=0" in url for url in session.get_log)
+    # Photo theme was NOT touched
+    assert not any("/theme/toggle?id=2" in url for url in session.get_log)
+
+
+@pytest.mark.asyncio
+async def test_disable_other_themes_handles_missing_endpoint(driver, session):
+    session.queue_get(
+        "/theme/list",
+        raise_for_status_error=aiohttp.ClientResponseError(
+            request_info=MagicMock(), history=(), status=404, message="not found"
+        ),
+    )
+    # Should not raise; returns empty list.
+    disabled = await driver.disable_other_themes()
+    assert disabled == []
+
+
+@pytest.mark.asyncio
 async def test_test_connection_success(driver, session):
     session.queue_get("/config", json={"brightness": 50, "freespace": 1024})
     result = await driver.test_connection()
