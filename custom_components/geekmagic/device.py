@@ -87,8 +87,8 @@ class GeekMagicDevice:
         return DriverCapabilities(
             supports_navigation=False,
             supports_on_demand_image=False,
-            supports_builtin_themes=False,
-            builtin_theme_threshold=None,
+            custom_theme=None,
+            builtin_modes={},
         )
 
     @property

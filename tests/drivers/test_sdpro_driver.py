@@ -98,6 +98,57 @@ async def test_upload_and_display_alternates_and_retires(driver, session):
 
 
 @pytest.mark.asyncio
+async def test_upload_and_display_isolates_themes_and_photos():
+    """Dashboard mode disables competing themes and other enabled photos."""
+
+    def _make_response(json_value):
+        resp = MagicMock()
+        resp.raise_for_status = MagicMock()
+        resp.json = AsyncMock(return_value=json_value)
+        resp.__aenter__ = AsyncMock(return_value=resp)
+        resp.__aexit__ = AsyncMock()
+        return resp
+
+    def _route(url, *args, **kwargs):
+        if "/theme/list" in url:
+            return _make_response(
+                {
+                    "themes": [
+                        {"id": 0, "name": "Classic", "enabled": True},
+                        {"id": 1, "name": "Weather", "enabled": True},
+                        {"id": 2, "name": "Photo", "enabled": True},
+                    ]
+                }
+            )
+        if "/photo/list" in url:
+            return _make_response(
+                {
+                    "files": [
+                        {"name": "vacation.jpg", "enabled": True},
+                        {"name": "dashboard_a.jpg", "enabled": True},
+                    ]
+                }
+            )
+        return _make_response({})
+
+    session = MagicMock()
+    session.get = MagicMock(side_effect=_route)
+    session.post = MagicMock(return_value=_make_response({}))
+    driver = SdProDriver(HOST, BASE_URL, AsyncMock(return_value=session))
+
+    await driver.upload_and_display(b"frame", "dashboard.jpg")
+
+    urls = [call.args[0] for call in session.get.call_args_list]
+    # Competing built-in themes are disabled; Photo is left enabled.
+    assert f"{BASE_URL}/theme/toggle?id=0&state=0" in urls
+    assert f"{BASE_URL}/theme/toggle?id=1&state=0" in urls
+    assert not any("theme/toggle?id=2&state=0" in u for u in urls)
+    # The competing user photo is disabled; the dashboard frame is not.
+    assert f"{BASE_URL}/photo/toggle?name=vacation.jpg&state=0" in urls
+    assert not any("photo/toggle?name=dashboard_a.jpg&state=0" in u for u in urls)
+
+
+@pytest.mark.asyncio
 async def test_reboot_swallows_connection_error(driver, session):
     """The device drops the connection on /restart; that is treated as success."""
     session.get.return_value.__aenter__.side_effect = aiohttp.ClientError("dropped")
@@ -109,5 +160,5 @@ async def test_capabilities(driver):
     caps = driver.capabilities
     assert caps.supports_navigation is False
     assert caps.supports_on_demand_image is False
-    assert caps.supports_builtin_themes is False
-    assert caps.builtin_theme_threshold is None
+    assert caps.custom_theme is None
+    assert caps.builtin_modes == {}

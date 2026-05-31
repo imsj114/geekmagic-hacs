@@ -121,8 +121,18 @@ def _setup_sdpro_mocks(
             "interval": 5,
         },
     )
+    aioclient_mock.get(
+        f"{base}/theme/list",
+        json={
+            "interval": 30,
+            "themes": [
+                {"id": 0, "name": "Classic", "enabled": True},
+                {"id": 2, "name": "Photo", "enabled": True},
+            ],
+        },
+    )
     aioclient_mock.post(f"{base}/photo/upload", status=200)
-    for path in ("api/set", "photo/toggle", "photo/delete", "photo/interval", "theme"):
+    for path in ("api/set", "photo/toggle", "photo/delete", "photo/interval", "theme/toggle"):
         aioclient_mock.get(re.compile(rf"^{re.escape(base)}/{path}"), status=200)
     aioclient_mock.get(f"{base}/restart", status=200)
 
@@ -183,8 +193,9 @@ class TestSetupLifecycle:
     ):
         """Test that connection failure results in ConfigEntryNotReady."""
         base = f"http://{DEVICE_HOST}"
+        # An offline host times out on every request, including detection probes.
         aioclient_mock.get(
-            f"{base}/space.json",
+            re.compile(rf"^{re.escape(base)}/"),
             exc=TimeoutError("Connection timed out"),
         )
 

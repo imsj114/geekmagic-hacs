@@ -52,6 +52,25 @@ async def test_ultra_uses_photo_album_theme(session):
     session.get.assert_called_with(f"{BASE_URL}/set?theme=3")
 
 
+def test_builtin_modes_are_per_firmware():
+    """Pro and Ultra expose different built-in theme maps, excluding custom."""
+    pro_modes = PRO.capabilities.builtin_modes
+    ultra_modes = ULTRA.capabilities.builtin_modes
+
+    # Custom theme is never offered as a built-in mode.
+    assert PRO.capabilities.custom_theme == 4
+    assert 4 not in pro_modes.values()
+    assert ULTRA.capabilities.custom_theme == 3
+    assert 3 not in ultra_modes.values()
+
+    # Pro's theme numbers differ from Ultra's (per the device reports).
+    assert pro_modes["Weather"] == 3
+    assert pro_modes["Clock"] == 6
+    assert ultra_modes["Weather Clock Today"] == 1
+    # The two maps are genuinely distinct, not a shared global table.
+    assert pro_modes != ultra_modes
+
+
 @pytest.mark.asyncio
 async def test_pro_reads_brightness_from_sys_path(session, response):
     """Pro reads brightness from /.sys/brt.json."""

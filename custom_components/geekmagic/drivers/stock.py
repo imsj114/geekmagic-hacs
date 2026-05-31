@@ -41,13 +41,42 @@ class StockVariant:
     capabilities: DriverCapabilities
 
 
+# Ultra V9 theme map (from docs/devices/old-ultra): 1=Weather Clock Today,
+# 2=Weather Forecast, 3=Photo Album (custom image), 4-6=Time styles,
+# 7=Simple Weather Clock. Theme 3 is the custom slot, so it is excluded here.
+_ULTRA_BUILTIN_MODES = {
+    "Weather Clock Today": 1,
+    "Weather Forecast": 2,
+    "Time Style 1": 4,
+    "Time Style 2": 5,
+    "Time Style 3": 6,
+    "Simple Weather Clock": 7,
+}
+
+# Pro V3.3.76 theme map (from docs/devices/new-pro): 0=Bitcoin, 1=CoinGecko,
+# 2=Stocks, 3=Weather, 4=Picture (custom image), 5=Monitor, 6=Clock, 7=Ideas.
+# Theme 4 is the custom slot, so it is excluded here.
+_PRO_BUILTIN_MODES = {
+    "Bitcoin": 0,
+    "CoinGecko": 1,
+    "Stocks": 2,
+    "Weather": 3,
+    "Monitor": 5,
+    "Clock": 6,
+    "Ideas": 7,
+}
+
 ULTRA = StockVariant(
     model=MODEL_ULTRA,
     model_name="SmallTV Ultra",
     custom_theme_number=3,
     brightness_path="/brt.json",
     state_path="/app.json",
-    capabilities=DriverCapabilities(supports_navigation=False, builtin_theme_threshold=3),
+    capabilities=DriverCapabilities(
+        supports_navigation=False,
+        custom_theme=3,
+        builtin_modes=_ULTRA_BUILTIN_MODES,
+    ),
 )
 
 PRO = StockVariant(
@@ -57,7 +86,11 @@ PRO = StockVariant(
     # V3.3.76EN exposes brightness under /.sys/, and has no /app.json.
     brightness_path="/.sys/brt.json",
     state_path=None,
-    capabilities=DriverCapabilities(supports_navigation=True, builtin_theme_threshold=3),
+    capabilities=DriverCapabilities(
+        supports_navigation=True,
+        custom_theme=4,
+        builtin_modes=_PRO_BUILTIN_MODES,
+    ),
 )
 
 

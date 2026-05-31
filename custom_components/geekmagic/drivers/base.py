@@ -11,7 +11,7 @@ from __future__ import annotations
 import logging
 from abc import ABC, abstractmethod
 from collections.abc import Awaitable, Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Literal
 
 import aiohttp
@@ -75,12 +75,14 @@ class DriverCapabilities:
     # Device can be told to display a specific named image on demand. False for
     # firmwares whose display is a device-managed slideshow (SD_PRO).
     supports_on_demand_image: bool = True
-    # Device has the stock built-in theme set (Weather/Time/etc.) selectable by
-    # number. False when the theme set differs (SD_PRO).
-    supports_builtin_themes: bool = True
-    # Themes numbered below this threshold are device-managed "built-in" modes;
-    # the coordinator syncs display mode to them. None disables the sync.
-    builtin_theme_threshold: int | None = 3
+    # The theme number that means "show the integration's rendered image"
+    # (Ultra 3 = Photo Album, Pro 4 = Picture). None when the firmware has no
+    # such concept (SD_PRO, where the dashboard is faked via the slideshow).
+    custom_theme: int | None = None
+    # Selectable device built-in modes, mapped display-name -> theme number.
+    # Firmware-specific: Ultra and Pro number their themes differently, so this
+    # cannot be a single global table. Empty means "no built-in modes to offer".
+    builtin_modes: dict[str, int] = field(default_factory=dict)
 
 
 async def classify_connection(

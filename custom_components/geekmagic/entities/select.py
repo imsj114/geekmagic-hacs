@@ -19,17 +19,9 @@ if TYPE_CHECKING:
 
 _LOGGER = logging.getLogger(__name__)
 
-# Built-in device modes with their theme numbers
-# These are handled by the device firmware, not rendered by the integration
-# Theme 3 (Photo Album) is intentionally omitted - used for custom rendered views
-BUILTIN_MODES = {
-    "Weather Clock Today": 1,
-    "Weather Forecast": 2,
-    "Time Style 1": 4,
-    "Time Style 2": 5,
-    "Time Style 3": 6,
-    "Simple Weather Clock": 7,
-}
+# Built-in device modes are firmware-specific (Ultra and Pro number their
+# themes differently), so the name->theme map comes from the active driver's
+# capabilities rather than a global table. See drivers/stock.py.
 
 # Prefix used to identify custom views in the combined select
 CUSTOM_VIEW_PREFIX = ""  # No prefix - views shown by name directly
@@ -73,14 +65,11 @@ class GeekMagicDisplaySelect(GeekMagicEntity, SelectEntity):
         self._last_options: list[str] | None = None
 
     def _builtin_modes(self) -> dict[str, int]:
-        """Return stock built-in modes, or none if the firmware lacks them.
+        """Return the active firmware's built-in modes (name -> theme number).
 
-        SD_PRO uses a different theme set, so its stock built-in entries would
-        be wrong; hide them behind the capability flag.
+        Empty for firmwares with no selectable stock themes (e.g. SD_PRO).
         """
-        if self.coordinator.device.capabilities.supports_builtin_themes:
-            return BUILTIN_MODES
-        return {}
+        return self.coordinator.device.capabilities.builtin_modes
 
     def _get_custom_view_names(self) -> list[str]:
         """Get list of custom view names."""

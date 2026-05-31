@@ -1066,17 +1066,17 @@ class GeekMagicCoordinator(DataUpdateCoordinator):
                 self._device_state = await self.device.get_state()
                 self._space_info = await self.device.get_space()
 
-                # Sync display mode with device state on first poll
-                # If device is in a built-in theme, respect that. The threshold
-                # is firmware-specific (None disables the sync entirely).
-                threshold = self.device.capabilities.builtin_theme_threshold
-                if (
-                    threshold is not None
-                    and self._device_state
-                    and self._device_state.theme is not None
-                ):
+                # Sync display mode with device state on first poll.
+                # If the device was manually switched to one of its built-in
+                # themes, respect that. We match against the firmware's explicit
+                # set of built-in theme numbers (not a "< N" heuristic): the
+                # custom-image theme differs per firmware (Ultra 3, Pro 4) and
+                # built-ins sit on both sides of it on Pro.
+                caps = self.device.capabilities
+                builtin_themes = set(caps.builtin_modes.values())
+                if builtin_themes and self._device_state and self._device_state.theme is not None:
                     device_theme = self._device_state.theme
-                    if device_theme < threshold and self._display_mode == "custom":
+                    if device_theme in builtin_themes and self._display_mode == "custom":
                         # Device is in built-in mode but we thought we were in custom
                         # This can happen on startup - sync to device state
                         _LOGGER.debug(

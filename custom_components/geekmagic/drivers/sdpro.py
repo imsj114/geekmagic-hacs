@@ -52,8 +52,10 @@ class SdProDriver(FirmwareDriver):
     capabilities = DriverCapabilities(
         supports_navigation=False,
         supports_on_demand_image=False,
-        supports_builtin_themes=False,
-        builtin_theme_threshold=None,
+        # No stock built-in theme set, and the dashboard is faked via the
+        # slideshow rather than a dedicated "custom image" theme.
+        custom_theme=None,
+        builtin_modes={},
     )
 
     def __init__(
@@ -136,24 +138,75 @@ class SdProDriver(FirmwareDriver):
 
         ``filename`` from the coordinator is ignored; we alternate between two
         internal names so the new frame exists before the old is removed.
+
+        To keep the dashboard actually visible, we isolate it from the device's
+        own slideshow/theme rotation: only the Photo theme stays enabled, and
+        only our dashboard frame stays enabled in the photo pool. Otherwise the
+        device would rotate to other themes/photos and the dashboard would only
+        flash by intermittently.
         """
         new_frame = self._next_frame_name()
 
         # 1. Upload the new frame.
         await self.upload(image_data, new_frame)
-        # 2. Ensure the device is showing the photo slideshow.
+        # 2. Make Photo the only enabled theme so rotation can't switch away.
         await self.set_theme(PHOTO_THEME)
-        # 3. Enable only the new frame and keep rotation short.
+        await self._isolate_photo_theme()
+        # 3. Enable only the new frame; disable any competing photos.
         await self.set_image(new_frame)
+        await self._isolate_dashboard_photo(keep=new_frame)
         try:
             await self._get(f"/photo/interval?val={DASHBOARD_INTERVAL_SECONDS}")
         except aiohttp.ClientError as err:
             _LOGGER.debug("Failed to set photo interval (non-fatal): %s", err)
-        # 4. Retire the previous frame.
+        # 4. Retire the previous frame (our own alternate name only).
         if self._last_frame and self._last_frame != new_frame:
             await self._retire_frame(self._last_frame)
         self._last_frame = new_frame
         _LOGGER.debug("Displayed dashboard frame %s", new_frame)
+
+    async def _isolate_photo_theme(self) -> None:
+        """Disable every built-in theme except Photo so rotation can't switch.
+
+        Best-effort: if ``/theme/list`` or a toggle fails we keep going, since
+        the dashboard is still likely visible if Photo was already the active
+        theme.
+        """
+        try:
+            data = await self._get_json("/theme/list")
+        except (aiohttp.ClientError, ValueError) as err:
+            _LOGGER.debug("Could not read theme list to isolate dashboard: %s", err)
+            return
+        for theme in data.get("themes", []):
+            theme_id = theme.get("id")
+            if theme_id is None or theme_id == PHOTO_THEME:
+                continue
+            if theme.get("enabled"):
+                try:
+                    await self._get(f"/theme/toggle?id={theme_id}&state=0")
+                except aiohttp.ClientError as err:
+                    _LOGGER.debug("Failed to disable theme %s (non-fatal): %s", theme_id, err)
+
+    async def _isolate_dashboard_photo(self, *, keep: str) -> None:
+        """Disable every enabled photo except ``keep`` (our dashboard frame).
+
+        User photos and our stale alternate frame are toggled off so the
+        slideshow shows only the live dashboard. Non-fatal on error.
+        """
+        try:
+            data = await self._get_json("/photo/list")
+        except (aiohttp.ClientError, ValueError) as err:
+            _LOGGER.debug("Could not read photo list to isolate dashboard: %s", err)
+            return
+        for entry in data.get("files", []):
+            name = entry.get("name")
+            if not name or name == keep:
+                continue
+            if entry.get("enabled"):
+                try:
+                    await self._get(f"/photo/toggle?name={name}&state=0")
+                except aiohttp.ClientError as err:
+                    _LOGGER.debug("Failed to disable photo %s (non-fatal): %s", name, err)
 
     async def delete_file(self, path: str) -> None:
         """Delete a photo by name (``/photo/delete``)."""
