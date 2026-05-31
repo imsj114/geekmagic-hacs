@@ -53,7 +53,6 @@ from .const import (
     LAYOUT_THREE_COLUMN,
     LAYOUT_THREE_ROW,
     MAX_BACKOFF_MULTIPLIER,
-    MODEL_PRO,
     THEME_WATCHOS,
 )
 from .device import DeviceState, GeekMagicDevice, SpaceInfo
@@ -668,12 +667,13 @@ class GeekMagicCoordinator(DataUpdateCoordinator):
             next_screen = (self._current_screen + 1) % len(self._layouts)
             await self.async_set_screen(next_screen)
 
-            # For Pro devices, also trigger device navigation to help refresh
-            if self.device.model == MODEL_PRO:
+            # On devices with hardware navigation, also nudge the device to
+            # help refresh the display.
+            if self.device.capabilities.supports_navigation:
                 try:
                     await self.device.navigate_next()
                 except Exception as err:
-                    _LOGGER.debug("Pro navigate_next failed (non-fatal): %s", err)
+                    _LOGGER.debug("Device navigate_next failed (non-fatal): %s", err)
 
     async def async_previous_screen(self) -> None:
         """Switch to the previous screen."""
@@ -681,12 +681,13 @@ class GeekMagicCoordinator(DataUpdateCoordinator):
             prev_screen = (self._current_screen - 1) % len(self._layouts)
             await self.async_set_screen(prev_screen)
 
-            # For Pro devices, also trigger device navigation to help refresh
-            if self.device.model == MODEL_PRO:
+            # On devices with hardware navigation, also nudge the device to
+            # help refresh the display.
+            if self.device.capabilities.supports_navigation:
                 try:
                     await self.device.navigate_previous()
                 except Exception as err:
-                    _LOGGER.debug("Pro navigate_previous failed (non-fatal): %s", err)
+                    _LOGGER.debug("Device navigate_previous failed (non-fatal): %s", err)
 
     def update_options(self, options: dict[str, Any]) -> None:
         """Update coordinator options.
@@ -1052,9 +1053,11 @@ class GeekMagicCoordinator(DataUpdateCoordinator):
                 or now - self._last_brightness_poll >= self._brightness_poll_interval
             ):
                 try:
-                    self._device_brightness = await self.device.get_brightness()
+                    brightness = await self.device.get_brightness()
                     self._last_brightness_poll = now
-                    _LOGGER.debug("Polled device brightness: %d", self._device_brightness)
+                    if brightness is not None:
+                        self._device_brightness = brightness
+                        _LOGGER.debug("Polled device brightness: %d", brightness)
                 except Exception as e:
                     _LOGGER.debug("Failed to poll device brightness: %s", e)
 
@@ -1064,10 +1067,16 @@ class GeekMagicCoordinator(DataUpdateCoordinator):
                 self._space_info = await self.device.get_space()
 
                 # Sync display mode with device state on first poll
-                # If device is in a built-in theme, respect that
-                if self._device_state and self._device_state.theme is not None:
+                # If device is in a built-in theme, respect that. The threshold
+                # is firmware-specific (None disables the sync entirely).
+                threshold = self.device.capabilities.builtin_theme_threshold
+                if (
+                    threshold is not None
+                    and self._device_state
+                    and self._device_state.theme is not None
+                ):
                     device_theme = self._device_state.theme
-                    if device_theme < 3 and self._display_mode == "custom":
+                    if device_theme < threshold and self._display_mode == "custom":
                         # Device is in built-in mode but we thought we were in custom
                         # This can happen on startup - sync to device state
                         _LOGGER.debug(
