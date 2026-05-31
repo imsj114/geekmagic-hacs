@@ -75,8 +75,9 @@ class TestConfigFlowUser:
 
     async def test_user_flow_connection_timeout(self, hass: HomeAssistant, aioclient_mock):
         """Test user flow shows timeout error when device times out."""
+        # An offline host times out on every request, including detection probes.
         aioclient_mock.get(
-            f"{BASE_URL}/space.json",
+            re.compile(rf"^{re.escape(BASE_URL)}/"),
             exc=TimeoutError("Connection timed out"),
         )
 
@@ -91,8 +92,9 @@ class TestConfigFlowUser:
 
     async def test_user_flow_connection_refused(self, hass: HomeAssistant, aioclient_mock):
         """Test user flow shows connection refused error."""
+        # An offline host refuses every request, including detection probes.
         aioclient_mock.get(
-            f"{BASE_URL}/space.json",
+            re.compile(rf"^{re.escape(BASE_URL)}/"),
             exc=OSError("Connection refused"),
         )
 
