@@ -60,3 +60,7 @@ home-assistant_v2.db
 # then whitelist `skills/`.
 .claude/*
 !.claude/skills/
+
+# Local HA pod test snapshots
+.ha-pod-backup/
+scripts/ha-pod-deploy.sh
