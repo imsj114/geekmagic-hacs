@@ -74,41 +74,58 @@ class ChartDisplay(Component):
                     min_val = min(self.data)
                     max_val = max(self.data)
                     # Prefix with "Min"/"Max" so the bottom strip reads as
-                    # data extremes, not as x-axis start/end ticks.
+                    # data extremes, not as x-axis start/end ticks. Pick the
+                    # largest font (small -> tiny) at which both labels fit
+                    # side by side; if even the tiny labels overflow a narrow
+                    # cell, fall back to bare numbers so the range is never
+                    # dropped entirely.
                     min_text = f"Min {min_val:.1f}"
                     max_text = f"Max {max_val:.1f}"
-                    # Skip range labels if they'd overlap (combined width >
-                    # available area minus a small gap).
-                    min_w, _ = ctx.get_text_size(min_text, font_label)
-                    max_w, _ = ctx.get_text_size(max_text, font_label)
-                    if min_w + max_w + 8 <= inner_w:
-                        range_y = chart_bottom + int(height * 0.08)
-                        ctx.draw_text(
-                            min_text,
-                            (x + padding, range_y),
-                            font=font_label,
-                            color=THEME_TEXT_SECONDARY,
-                            anchor="lm",
-                        )
-                        ctx.draw_text(
-                            max_text,
-                            (x + width - padding, range_y),
-                            font=font_label,
-                            color=THEME_TEXT_SECONDARY,
-                            anchor="rm",
-                        )
-                        # Center the period (e.g. "24h") between Min/Max only
-                        # when there's clear room — omit it otherwise.
-                        if self.period_label:
-                            period_w, _ = ctx.get_text_size(self.period_label, font_label)
-                            if min_w + max_w + period_w + 16 <= inner_w:
-                                ctx.draw_text(
-                                    self.period_label,
-                                    (x + width // 2, range_y),
-                                    font=font_label,
-                                    color=THEME_TEXT_TERTIARY,
-                                    anchor="mm",
-                                )
+                    range_font = None
+                    # The labels are anchored to opposite edges, so they only
+                    # touch when their combined width exceeds inner_w; a 2px
+                    # buffer keeps a hair of gap between them.
+                    for size in ("small", "tiny"):
+                        candidate = ctx.get_font(size)
+                        min_w, _ = ctx.get_text_size(min_text, candidate)
+                        max_w, _ = ctx.get_text_size(max_text, candidate)
+                        if min_w + max_w + 2 <= inner_w:
+                            range_font = candidate
+                            break
+                    if range_font is None:
+                        min_text = f"{min_val:.1f}"
+                        max_text = f"{max_val:.1f}"
+                        range_font = ctx.get_font("tiny")
+                        min_w, _ = ctx.get_text_size(min_text, range_font)
+                        max_w, _ = ctx.get_text_size(max_text, range_font)
+
+                    range_y = chart_bottom + int(height * 0.08)
+                    ctx.draw_text(
+                        min_text,
+                        (x + padding, range_y),
+                        font=range_font,
+                        color=THEME_TEXT_SECONDARY,
+                        anchor="lm",
+                    )
+                    ctx.draw_text(
+                        max_text,
+                        (x + width - padding, range_y),
+                        font=range_font,
+                        color=THEME_TEXT_SECONDARY,
+                        anchor="rm",
+                    )
+                    # Center the period (e.g. "24h") between Min/Max only
+                    # when there's clear room — omit it otherwise.
+                    if self.period_label:
+                        period_w, _ = ctx.get_text_size(self.period_label, range_font)
+                        if min_w + max_w + period_w + 16 <= inner_w:
+                            ctx.draw_text(
+                                self.period_label,
+                                (x + width // 2, range_y),
+                                font=range_font,
+                                color=THEME_TEXT_TERTIARY,
+                                anchor="mm",
+                            )
         else:
             center_x = x + width // 2
             center_y = (chart_top + chart_bottom) // 2
