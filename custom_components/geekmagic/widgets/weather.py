@@ -256,6 +256,7 @@ class WeatherDisplay(Component):
         icon_size: int,
         high_only: bool = False,
         show_day: bool = True,
+        vertical_day: bool = False,
     ) -> Component:
         """One vertical forecast cell: ``DAY`` / icon / ``hi°/lo°`` (or ``hi°``).
 
@@ -263,7 +264,9 @@ class WeatherDisplay(Component):
         where each column shares a tight slice of the cell width and
         ``"26°/14°"`` would collide with its neighbours. ``show_day`` drops
         the weekday caption for very short cells where there's no vertical
-        room for three bands.
+        room for three bands. ``vertical_day`` stacks the weekday letters
+        (``M`` / ``O`` / ``N``) beside the icon+temp instead of a
+        horizontal caption above them.
         """
         day_condition = day.get("condition", "sunny")
         day_icon = WEATHER_ICONS.get(day_condition, "weather-sunny")
@@ -277,13 +280,34 @@ class WeatherDisplay(Component):
         else:
             temp_text = _temp_str(day_temp)
 
+        icon = Icon(day_icon, size=icon_size, color=day_tint)
+        temp = Text(temp_text, font="tiny", bold=True, color=THEME_TEXT_PRIMARY, auto_fit=True)
+
+        if show_day and vertical_day:
+            # Weekday spelled top-to-bottom (M / O / N) beside the icon+temp.
+            letters = Column(
+                children=[
+                    Text(ch, font="tiny", color=THEME_TEXT_SECONDARY) for ch in day_name.upper()
+                ],
+                gap=0,
+                align="center",
+                justify="center",
+            )
+            return Row(
+                children=[
+                    letters,
+                    Column(children=[icon, temp], gap=2, align="center", justify="center"),
+                ],
+                gap=4,
+                align="center",
+                justify="center",
+            )
+
         children: list[Component] = []
         if show_day:
             children.append(Text(day_name.upper(), font="tiny", color=THEME_TEXT_SECONDARY))
-        children.append(Icon(day_icon, size=icon_size, color=day_tint))
-        children.append(
-            Text(temp_text, font="tiny", bold=True, color=THEME_TEXT_PRIMARY, auto_fit=True)
-        )
+        children.append(icon)
+        children.append(temp)
         return Column(children=children, gap=2, align="center", justify="center")
 
     def _forecast_days_for_width(self, width: int) -> int:
@@ -307,6 +331,7 @@ class WeatherDisplay(Component):
         max_days: int | None = None,
         high_only: bool = False,
         show_day: bool = True,
+        vertical_day: bool = False,
     ) -> Component | None:
         """Horizontal strip of forecast columns, or ``None`` when not shown."""
         if not self._want_forecast:
@@ -316,7 +341,9 @@ class WeatherDisplay(Component):
         if not items:
             return None
         columns = [
-            self._forecast_column(day, i, icon_size, high_only=high_only, show_day=show_day)
+            self._forecast_column(
+                day, i, icon_size, high_only=high_only, show_day=show_day, vertical_day=vertical_day
+            )
             for i, day in enumerate(items)
         ]
         return Row(children=columns, gap=0, align="center", justify="space-around")
@@ -371,11 +398,11 @@ class WeatherDisplay(Component):
         """
         padding = max(4, int(min(width, height) * 0.05))
         side_by_side = width >= height * 1.2
-        icon_size = max(28, int(min(width, height) * (0.30 if side_by_side else 0.26)))
+        icon_size = max(32, int(min(width, height) * (0.36 if side_by_side else 0.32)))
 
         temp_text = Text(
             _temp_str(self.temperature),
-            font="huge",
+            font="xlarge",
             bold=True,
             color=THEME_TEXT_PRIMARY,
             auto_fit=True,
@@ -414,17 +441,20 @@ class WeatherDisplay(Component):
             justify="center",
         )
 
-        bands: list[Component] = [top_block]
         forecast_row = self._forecast_row(width, height, max(18, int(height * 0.17)))
-        if forecast_row is not None:
-            bands.append(forecast_row)
+        if forecast_row is None:
+            return top_block
 
+        # Pin the current-conditions block near the top and the forecast
+        # near the bottom so the cell's full height is used and there's a
+        # clear vertical gap between them (rather than the two bands
+        # hugging the vertical centre).
         return Column(
-            children=bands,
-            gap=int(height * 0.06),
-            padding=padding,
+            children=[top_block, Spacer(), forecast_row],
+            gap=int(height * 0.04),
+            padding=max(padding, int(height * 0.06)),
             align="stretch",
-            justify="space-evenly",
+            justify="start",
         )
 
     def _build_vertical(
@@ -441,14 +471,14 @@ class WeatherDisplay(Component):
         used elsewhere overflows here.
         """
         padding = max(4, int(width * 0.06))
-        icon_size = max(28, int(width * 0.34))
+        icon_size = max(34, int(width * 0.42))
 
         current = Column(
             children=[
                 Icon(icon_name, size=icon_size, color=icon_tint),
                 Text(
                     _temp_str(self.temperature),
-                    font="huge",
+                    font="xlarge",
                     bold=True,
                     color=THEME_TEXT_PRIMARY,
                     auto_fit=True,
@@ -592,16 +622,12 @@ class WeatherDisplay(Component):
         padding = max(4, int(width * 0.04))
         is_wide = width >= 200
 
-        # Request: the wide (2x1-style) top line reads bigger — bump both
-        # the icon and the temperature ~30%.
-        if is_wide:
-            icon_size = max(20, min(40, int(height * 0.40)))
-            temp_font = "xlarge"
-            meta_font = "small"
-        else:
-            icon_size = max(16, min(28, int(height * 0.28)))
-            temp_font = "large"
-            meta_font = "tiny"
+        # Big, glanceable current line in every medium cell — the icon and
+        # temp are the headline. Cap the icon by width too so it doesn't
+        # crowd the temp in a narrow (3-column-grid) cell.
+        icon_size = max(20, min(44, int(height * 0.40), int(width * 0.42)))
+        temp_font = "xlarge"
+        meta_font = "small" if is_wide else "tiny"
         mini_icon_size = max(14, int(height * 0.24))
 
         top_children: list[Component] = [
@@ -623,7 +649,9 @@ class WeatherDisplay(Component):
         top_row = Row(children=top_children, gap=6, align="center", justify="center")
 
         if is_wide:
-            bottom_row = self._forecast_row(width, height, mini_icon_size)
+            # Wide (2x1) cell: weekday spelled vertically beside each
+            # forecast item, full hi/lo temps.
+            bottom_row = self._forecast_row(width, height, mini_icon_size, vertical_day=True)
         else:
             # Narrow cells: day + single temp, column count scaled to width.
             bottom_row = self._forecast_row(
@@ -663,13 +691,13 @@ class WeatherDisplay(Component):
         padding = max(2, int(min(width, height) * 0.05))
 
         if self._want_forecast and width >= 70 and height >= 58:
-            top_icon = max(14, min(30, int(height * 0.34)))
+            top_icon = max(18, min(40, int(height * 0.46), int(width * 0.36)))
             top_row = Row(
                 children=[
                     Icon(icon_name, size=top_icon, color=icon_tint),
                     Text(
                         _temp_str(self.temperature),
-                        font="large",
+                        font="xlarge",
                         bold=True,
                         color=THEME_TEXT_PRIMARY,
                         auto_fit=True,
