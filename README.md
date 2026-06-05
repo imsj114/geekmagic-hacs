@@ -33,24 +33,24 @@ Special thanks to:
 ## Dashboard Samples
 
 <p align="center">
-  <img src="samples/01_system_monitor.png" alt="System Monitor" width="200">
-  <img src="samples/02_smart_home.png" alt="Smart Home" width="200">
-  <img src="samples/03_weather.png" alt="Weather" width="200">
-  <img src="samples/04_server_stats.png" alt="Server Stats" width="200">
+  <img src="https://raw.githubusercontent.com/adrienbrault/geekmagic-hacs/main/samples/01_system_monitor.png" alt="System Monitor" width="200">
+  <img src="https://raw.githubusercontent.com/adrienbrault/geekmagic-hacs/main/samples/02_smart_home.png" alt="Smart Home" width="200">
+  <img src="https://raw.githubusercontent.com/adrienbrault/geekmagic-hacs/main/samples/03_weather.png" alt="Weather" width="200">
+  <img src="https://raw.githubusercontent.com/adrienbrault/geekmagic-hacs/main/samples/04_server_stats.png" alt="Server Stats" width="200">
 </p>
 
 <p align="center">
-  <img src="samples/05_media_player.png" alt="Media Player" width="200">
-  <img src="samples/06_energy_monitor.png" alt="Energy Monitor" width="200">
-  <img src="samples/07_fitness.png" alt="Fitness Tracker" width="200">
-  <img src="samples/08_clock_dashboard.png" alt="Clock Dashboard" width="200">
+  <img src="https://raw.githubusercontent.com/adrienbrault/geekmagic-hacs/main/samples/05_media_player.png" alt="Media Player" width="200">
+  <img src="https://raw.githubusercontent.com/adrienbrault/geekmagic-hacs/main/samples/06_energy_monitor.png" alt="Energy Monitor" width="200">
+  <img src="https://raw.githubusercontent.com/adrienbrault/geekmagic-hacs/main/samples/07_fitness.png" alt="Fitness Tracker" width="200">
+  <img src="https://raw.githubusercontent.com/adrienbrault/geekmagic-hacs/main/samples/08_clock_dashboard.png" alt="Clock Dashboard" width="200">
 </p>
 
 <p align="center">
-  <img src="samples/09_network_monitor.png" alt="Network Monitor" width="200">
-  <img src="samples/10_thermostat.png" alt="Thermostat" width="200">
-  <img src="samples/11_batteries.png" alt="Batteries" width="200">
-  <img src="samples/12_security.png" alt="Security" width="200">
+  <img src="https://raw.githubusercontent.com/adrienbrault/geekmagic-hacs/main/samples/09_network_monitor.png" alt="Network Monitor" width="200">
+  <img src="https://raw.githubusercontent.com/adrienbrault/geekmagic-hacs/main/samples/10_thermostat.png" alt="Thermostat" width="200">
+  <img src="https://raw.githubusercontent.com/adrienbrault/geekmagic-hacs/main/samples/11_batteries.png" alt="Batteries" width="200">
+  <img src="https://raw.githubusercontent.com/adrienbrault/geekmagic-hacs/main/samples/12_security.png" alt="Security" width="200">
 </p>
 
 ## Binary Sensor States & Icons
@@ -58,8 +58,8 @@ Special thanks to:
 Binary sensors display human-readable states and state-specific icons based on their `device_class`. Icons are sourced from Home Assistant's official icon definitions.
 
 <p align="center">
-  <img src="samples/16_binary_sensors.png" alt="Binary Sensor States" width="200">
-  <img src="samples/17_binary_sensors_more.png" alt="More Binary Sensors" width="200">
+  <img src="https://raw.githubusercontent.com/adrienbrault/geekmagic-hacs/main/samples/16_binary_sensors.png" alt="Binary Sensor States" width="200">
+  <img src="https://raw.githubusercontent.com/adrienbrault/geekmagic-hacs/main/samples/17_binary_sensors_more.png" alt="More Binary Sensors" width="200">
 </p>
 
 ## Domain State Icons
@@ -67,34 +67,34 @@ Binary sensors display human-readable states and state-specific icons based on t
 Entities like lights, switches, and fans show different icons based on their state (on/off).
 
 <p align="center">
-  <img src="samples/18_domain_icons.png" alt="Domain Icons" width="200">
+  <img src="https://raw.githubusercontent.com/adrienbrault/geekmagic-hacs/main/samples/18_domain_icons.png" alt="Domain Icons" width="200">
 </p>
 
 ## Widget Gallery
 
 | Widget | 1x1 | 1x2 | 2x1 | 2x2 | 2x3 | 3x3 |
 |--------|-----|-----|-----|-----|-----|-----|
-| **Gauge (Bar)** | <img src="samples/widgets/gauge_bar_1x1.png"> | <img src="samples/widgets/gauge_bar_1x2.png"> | <img src="samples/widgets/gauge_bar_2x1.png"> | <img src="samples/widgets/gauge_bar_2x2.png"> | <img src="samples/widgets/gauge_bar_2x3.png"> | <img src="samples/widgets/gauge_bar_3x3.png"> |
-| **Gauge (Ring)** | <img src="samples/widgets/gauge_ring_1x1.png"> | <img src="samples/widgets/gauge_ring_1x2.png"> | <img src="samples/widgets/gauge_ring_2x1.png"> | <img src="samples/widgets/gauge_ring_2x2.png"> | <img src="samples/widgets/gauge_ring_2x3.png"> | <img src="samples/widgets/gauge_ring_3x3.png"> |
-| **Gauge (Arc)** | <img src="samples/widgets/gauge_arc_1x1.png"> | <img src="samples/widgets/gauge_arc_1x2.png"> | <img src="samples/widgets/gauge_arc_2x1.png"> | <img src="samples/widgets/gauge_arc_2x2.png"> | <img src="samples/widgets/gauge_arc_2x3.png"> | <img src="samples/widgets/gauge_arc_3x3.png"> |
-| **Entity (Icon)** | <img src="samples/widgets/entity_icon_1x1.png"> | <img src="samples/widgets/entity_icon_1x2.png"> | <img src="samples/widgets/entity_icon_2x1.png"> | <img src="samples/widgets/entity_icon_2x2.png"> | <img src="samples/widgets/entity_icon_2x3.png"> | <img src="samples/widgets/entity_icon_3x3.png"> |
-| **Entity (Plain)** | <img src="samples/widgets/entity_plain_1x1.png"> | <img src="samples/widgets/entity_plain_1x2.png"> | <img src="samples/widgets/entity_plain_2x1.png"> | <img src="samples/widgets/entity_plain_2x2.png"> | <img src="samples/widgets/entity_plain_2x3.png"> | <img src="samples/widgets/entity_plain_3x3.png"> |
-| **Clock** | <img src="samples/widgets/clock_1x1.png"> | <img src="samples/widgets/clock_1x2.png"> | <img src="samples/widgets/clock_2x1.png"> | <img src="samples/widgets/clock_2x2.png"> | <img src="samples/widgets/clock_2x3.png"> | <img src="samples/widgets/clock_3x3.png"> |
-| **Text** | <img src="samples/widgets/text_1x1.png"> | <img src="samples/widgets/text_1x2.png"> | <img src="samples/widgets/text_2x1.png"> | <img src="samples/widgets/text_2x2.png"> | <img src="samples/widgets/text_2x3.png"> | <img src="samples/widgets/text_3x3.png"> |
-| **Progress** | <img src="samples/widgets/progress_1x1.png"> | <img src="samples/widgets/progress_1x2.png"> | <img src="samples/widgets/progress_2x1.png"> | <img src="samples/widgets/progress_2x2.png"> | <img src="samples/widgets/progress_2x3.png"> | <img src="samples/widgets/progress_3x3.png"> |
-| **Weather** | <img src="samples/widgets/weather_1x1.png"> | <img src="samples/widgets/weather_1x2.png"> | <img src="samples/widgets/weather_2x1.png"> | <img src="samples/widgets/weather_2x2.png"> | <img src="samples/widgets/weather_2x3.png"> | <img src="samples/widgets/weather_3x3.png"> |
-| **Status** | <img src="samples/widgets/status_1x1.png"> | <img src="samples/widgets/status_1x2.png"> | <img src="samples/widgets/status_2x1.png"> | <img src="samples/widgets/status_2x2.png"> | <img src="samples/widgets/status_2x3.png"> | <img src="samples/widgets/status_3x3.png"> |
-| **Chart** | <img src="samples/widgets/chart_1x1.png"> | <img src="samples/widgets/chart_1x2.png"> | <img src="samples/widgets/chart_2x1.png"> | <img src="samples/widgets/chart_2x2.png"> | <img src="samples/widgets/chart_2x3.png"> | <img src="samples/widgets/chart_3x3.png"> |
-| **Candlestick** | <img src="samples/widgets/candlestick_1x1.png"> | <img src="samples/widgets/candlestick_1x2.png"> | <img src="samples/widgets/candlestick_2x1.png"> | <img src="samples/widgets/candlestick_2x2.png"> | <img src="samples/widgets/candlestick_2x3.png"> | <img src="samples/widgets/candlestick_3x3.png"> |
-| **Climate** | <img src="samples/widgets/climate_1x1.png"> | <img src="samples/widgets/climate_1x2.png"> | <img src="samples/widgets/climate_2x1.png"> | <img src="samples/widgets/climate_2x2.png"> | <img src="samples/widgets/climate_2x3.png"> | <img src="samples/widgets/climate_3x3.png"> |
-| **Attribute List** | <img src="samples/widgets/attribute_list_1x1.png"> | <img src="samples/widgets/attribute_list_1x2.png"> | <img src="samples/widgets/attribute_list_2x1.png"> | <img src="samples/widgets/attribute_list_2x2.png"> | <img src="samples/widgets/attribute_list_2x3.png"> | <img src="samples/widgets/attribute_list_3x3.png"> |
+| **Gauge (Bar)** | <img src="https://raw.githubusercontent.com/adrienbrault/geekmagic-hacs/main/samples/widgets/gauge_bar_1x1.png"> | <img src="https://raw.githubusercontent.com/adrienbrault/geekmagic-hacs/main/samples/widgets/gauge_bar_1x2.png"> | <img src="https://raw.githubusercontent.com/adrienbrault/geekmagic-hacs/main/samples/widgets/gauge_bar_2x1.png"> | <img src="https://raw.githubusercontent.com/adrienbrault/geekmagic-hacs/main/samples/widgets/gauge_bar_2x2.png"> | <img src="https://raw.githubusercontent.com/adrienbrault/geekmagic-hacs/main/samples/widgets/gauge_bar_2x3.png"> | <img src="https://raw.githubusercontent.com/adrienbrault/geekmagic-hacs/main/samples/widgets/gauge_bar_3x3.png"> |
+| **Gauge (Ring)** | <img src="https://raw.githubusercontent.com/adrienbrault/geekmagic-hacs/main/samples/widgets/gauge_ring_1x1.png"> | <img src="https://raw.githubusercontent.com/adrienbrault/geekmagic-hacs/main/samples/widgets/gauge_ring_1x2.png"> | <img src="https://raw.githubusercontent.com/adrienbrault/geekmagic-hacs/main/samples/widgets/gauge_ring_2x1.png"> | <img src="https://raw.githubusercontent.com/adrienbrault/geekmagic-hacs/main/samples/widgets/gauge_ring_2x2.png"> | <img src="https://raw.githubusercontent.com/adrienbrault/geekmagic-hacs/main/samples/widgets/gauge_ring_2x3.png"> | <img src="https://raw.githubusercontent.com/adrienbrault/geekmagic-hacs/main/samples/widgets/gauge_ring_3x3.png"> |
+| **Gauge (Arc)** | <img src="https://raw.githubusercontent.com/adrienbrault/geekmagic-hacs/main/samples/widgets/gauge_arc_1x1.png"> | <img src="https://raw.githubusercontent.com/adrienbrault/geekmagic-hacs/main/samples/widgets/gauge_arc_1x2.png"> | <img src="https://raw.githubusercontent.com/adrienbrault/geekmagic-hacs/main/samples/widgets/gauge_arc_2x1.png"> | <img src="https://raw.githubusercontent.com/adrienbrault/geekmagic-hacs/main/samples/widgets/gauge_arc_2x2.png"> | <img src="https://raw.githubusercontent.com/adrienbrault/geekmagic-hacs/main/samples/widgets/gauge_arc_2x3.png"> | <img src="https://raw.githubusercontent.com/adrienbrault/geekmagic-hacs/main/samples/widgets/gauge_arc_3x3.png"> |
+| **Entity (Icon)** | <img src="https://raw.githubusercontent.com/adrienbrault/geekmagic-hacs/main/samples/widgets/entity_icon_1x1.png"> | <img src="https://raw.githubusercontent.com/adrienbrault/geekmagic-hacs/main/samples/widgets/entity_icon_1x2.png"> | <img src="https://raw.githubusercontent.com/adrienbrault/geekmagic-hacs/main/samples/widgets/entity_icon_2x1.png"> | <img src="https://raw.githubusercontent.com/adrienbrault/geekmagic-hacs/main/samples/widgets/entity_icon_2x2.png"> | <img src="https://raw.githubusercontent.com/adrienbrault/geekmagic-hacs/main/samples/widgets/entity_icon_2x3.png"> | <img src="https://raw.githubusercontent.com/adrienbrault/geekmagic-hacs/main/samples/widgets/entity_icon_3x3.png"> |
+| **Entity (Plain)** | <img src="https://raw.githubusercontent.com/adrienbrault/geekmagic-hacs/main/samples/widgets/entity_plain_1x1.png"> | <img src="https://raw.githubusercontent.com/adrienbrault/geekmagic-hacs/main/samples/widgets/entity_plain_1x2.png"> | <img src="https://raw.githubusercontent.com/adrienbrault/geekmagic-hacs/main/samples/widgets/entity_plain_2x1.png"> | <img src="https://raw.githubusercontent.com/adrienbrault/geekmagic-hacs/main/samples/widgets/entity_plain_2x2.png"> | <img src="https://raw.githubusercontent.com/adrienbrault/geekmagic-hacs/main/samples/widgets/entity_plain_2x3.png"> | <img src="https://raw.githubusercontent.com/adrienbrault/geekmagic-hacs/main/samples/widgets/entity_plain_3x3.png"> |
+| **Clock** | <img src="https://raw.githubusercontent.com/adrienbrault/geekmagic-hacs/main/samples/widgets/clock_1x1.png"> | <img src="https://raw.githubusercontent.com/adrienbrault/geekmagic-hacs/main/samples/widgets/clock_1x2.png"> | <img src="https://raw.githubusercontent.com/adrienbrault/geekmagic-hacs/main/samples/widgets/clock_2x1.png"> | <img src="https://raw.githubusercontent.com/adrienbrault/geekmagic-hacs/main/samples/widgets/clock_2x2.png"> | <img src="https://raw.githubusercontent.com/adrienbrault/geekmagic-hacs/main/samples/widgets/clock_2x3.png"> | <img src="https://raw.githubusercontent.com/adrienbrault/geekmagic-hacs/main/samples/widgets/clock_3x3.png"> |
+| **Text** | <img src="https://raw.githubusercontent.com/adrienbrault/geekmagic-hacs/main/samples/widgets/text_1x1.png"> | <img src="https://raw.githubusercontent.com/adrienbrault/geekmagic-hacs/main/samples/widgets/text_1x2.png"> | <img src="https://raw.githubusercontent.com/adrienbrault/geekmagic-hacs/main/samples/widgets/text_2x1.png"> | <img src="https://raw.githubusercontent.com/adrienbrault/geekmagic-hacs/main/samples/widgets/text_2x2.png"> | <img src="https://raw.githubusercontent.com/adrienbrault/geekmagic-hacs/main/samples/widgets/text_2x3.png"> | <img src="https://raw.githubusercontent.com/adrienbrault/geekmagic-hacs/main/samples/widgets/text_3x3.png"> |
+| **Progress** | <img src="https://raw.githubusercontent.com/adrienbrault/geekmagic-hacs/main/samples/widgets/progress_1x1.png"> | <img src="https://raw.githubusercontent.com/adrienbrault/geekmagic-hacs/main/samples/widgets/progress_1x2.png"> | <img src="https://raw.githubusercontent.com/adrienbrault/geekmagic-hacs/main/samples/widgets/progress_2x1.png"> | <img src="https://raw.githubusercontent.com/adrienbrault/geekmagic-hacs/main/samples/widgets/progress_2x2.png"> | <img src="https://raw.githubusercontent.com/adrienbrault/geekmagic-hacs/main/samples/widgets/progress_2x3.png"> | <img src="https://raw.githubusercontent.com/adrienbrault/geekmagic-hacs/main/samples/widgets/progress_3x3.png"> |
+| **Weather** | <img src="https://raw.githubusercontent.com/adrienbrault/geekmagic-hacs/main/samples/widgets/weather_1x1.png"> | <img src="https://raw.githubusercontent.com/adrienbrault/geekmagic-hacs/main/samples/widgets/weather_1x2.png"> | <img src="https://raw.githubusercontent.com/adrienbrault/geekmagic-hacs/main/samples/widgets/weather_2x1.png"> | <img src="https://raw.githubusercontent.com/adrienbrault/geekmagic-hacs/main/samples/widgets/weather_2x2.png"> | <img src="https://raw.githubusercontent.com/adrienbrault/geekmagic-hacs/main/samples/widgets/weather_2x3.png"> | <img src="https://raw.githubusercontent.com/adrienbrault/geekmagic-hacs/main/samples/widgets/weather_3x3.png"> |
+| **Status** | <img src="https://raw.githubusercontent.com/adrienbrault/geekmagic-hacs/main/samples/widgets/status_1x1.png"> | <img src="https://raw.githubusercontent.com/adrienbrault/geekmagic-hacs/main/samples/widgets/status_1x2.png"> | <img src="https://raw.githubusercontent.com/adrienbrault/geekmagic-hacs/main/samples/widgets/status_2x1.png"> | <img src="https://raw.githubusercontent.com/adrienbrault/geekmagic-hacs/main/samples/widgets/status_2x2.png"> | <img src="https://raw.githubusercontent.com/adrienbrault/geekmagic-hacs/main/samples/widgets/status_2x3.png"> | <img src="https://raw.githubusercontent.com/adrienbrault/geekmagic-hacs/main/samples/widgets/status_3x3.png"> |
+| **Chart** | <img src="https://raw.githubusercontent.com/adrienbrault/geekmagic-hacs/main/samples/widgets/chart_1x1.png"> | <img src="https://raw.githubusercontent.com/adrienbrault/geekmagic-hacs/main/samples/widgets/chart_1x2.png"> | <img src="https://raw.githubusercontent.com/adrienbrault/geekmagic-hacs/main/samples/widgets/chart_2x1.png"> | <img src="https://raw.githubusercontent.com/adrienbrault/geekmagic-hacs/main/samples/widgets/chart_2x2.png"> | <img src="https://raw.githubusercontent.com/adrienbrault/geekmagic-hacs/main/samples/widgets/chart_2x3.png"> | <img src="https://raw.githubusercontent.com/adrienbrault/geekmagic-hacs/main/samples/widgets/chart_3x3.png"> |
+| **Candlestick** | <img src="https://raw.githubusercontent.com/adrienbrault/geekmagic-hacs/main/samples/widgets/candlestick_1x1.png"> | <img src="https://raw.githubusercontent.com/adrienbrault/geekmagic-hacs/main/samples/widgets/candlestick_1x2.png"> | <img src="https://raw.githubusercontent.com/adrienbrault/geekmagic-hacs/main/samples/widgets/candlestick_2x1.png"> | <img src="https://raw.githubusercontent.com/adrienbrault/geekmagic-hacs/main/samples/widgets/candlestick_2x2.png"> | <img src="https://raw.githubusercontent.com/adrienbrault/geekmagic-hacs/main/samples/widgets/candlestick_2x3.png"> | <img src="https://raw.githubusercontent.com/adrienbrault/geekmagic-hacs/main/samples/widgets/candlestick_3x3.png"> |
+| **Climate** | <img src="https://raw.githubusercontent.com/adrienbrault/geekmagic-hacs/main/samples/widgets/climate_1x1.png"> | <img src="https://raw.githubusercontent.com/adrienbrault/geekmagic-hacs/main/samples/widgets/climate_1x2.png"> | <img src="https://raw.githubusercontent.com/adrienbrault/geekmagic-hacs/main/samples/widgets/climate_2x1.png"> | <img src="https://raw.githubusercontent.com/adrienbrault/geekmagic-hacs/main/samples/widgets/climate_2x2.png"> | <img src="https://raw.githubusercontent.com/adrienbrault/geekmagic-hacs/main/samples/widgets/climate_2x3.png"> | <img src="https://raw.githubusercontent.com/adrienbrault/geekmagic-hacs/main/samples/widgets/climate_3x3.png"> |
+| **Attribute List** | <img src="https://raw.githubusercontent.com/adrienbrault/geekmagic-hacs/main/samples/widgets/attribute_list_1x1.png"> | <img src="https://raw.githubusercontent.com/adrienbrault/geekmagic-hacs/main/samples/widgets/attribute_list_1x2.png"> | <img src="https://raw.githubusercontent.com/adrienbrault/geekmagic-hacs/main/samples/widgets/attribute_list_2x1.png"> | <img src="https://raw.githubusercontent.com/adrienbrault/geekmagic-hacs/main/samples/widgets/attribute_list_2x2.png"> | <img src="https://raw.githubusercontent.com/adrienbrault/geekmagic-hacs/main/samples/widgets/attribute_list_2x3.png"> | <img src="https://raw.githubusercontent.com/adrienbrault/geekmagic-hacs/main/samples/widgets/attribute_list_3x3.png"> |
 
 ### Candlestick Chart
 
 Display OHLC (Open/High/Low/Close) candlestick charts from any numeric entity's history. Configurable candle intervals (1 hour, 4 hours, 1 day) and count.
 
 <p align="center">
-  <img src="samples/candlestick_example.png" alt="Candlestick Chart - BTC/USD" width="200">
+  <img src="https://raw.githubusercontent.com/adrienbrault/geekmagic-hacs/main/samples/candlestick_example.png" alt="Candlestick Chart - BTC/USD" width="200">
 </p>
 
 ## Layout Examples
@@ -102,45 +102,45 @@ Display OHLC (Open/High/Low/Close) candlestick charts from any numeric entity's 
 ### Fullscreen & Grid Layouts
 
 <p align="center">
-  <img src="samples/layouts/layout_fullscreen.png" alt="Fullscreen" width="200">
-  <img src="samples/layouts/layout_grid_2x2.png" alt="Grid 2x2" width="200">
-  <img src="samples/layouts/layout_grid_2x3.png" alt="Grid 2x3" width="200">
-  <img src="samples/layouts/layout_grid_3x2.png" alt="Grid 3x2" width="200">
-  <img src="samples/layouts/layout_grid_3x3.png" alt="Grid 3x3" width="200">
+  <img src="https://raw.githubusercontent.com/adrienbrault/geekmagic-hacs/main/samples/layouts/layout_fullscreen.png" alt="Fullscreen" width="200">
+  <img src="https://raw.githubusercontent.com/adrienbrault/geekmagic-hacs/main/samples/layouts/layout_grid_2x2.png" alt="Grid 2x2" width="200">
+  <img src="https://raw.githubusercontent.com/adrienbrault/geekmagic-hacs/main/samples/layouts/layout_grid_2x3.png" alt="Grid 2x3" width="200">
+  <img src="https://raw.githubusercontent.com/adrienbrault/geekmagic-hacs/main/samples/layouts/layout_grid_3x2.png" alt="Grid 3x2" width="200">
+  <img src="https://raw.githubusercontent.com/adrienbrault/geekmagic-hacs/main/samples/layouts/layout_grid_3x3.png" alt="Grid 3x3" width="200">
 </p>
 
 ### Split Layouts
 
 <p align="center">
-  <img src="samples/layouts/layout_split_horizontal.png" alt="Split Horizontal" width="200">
-  <img src="samples/layouts/layout_split_vertical.png" alt="Split Vertical" width="200">
-  <img src="samples/layouts/layout_split_h_1_2.png" alt="Split 1:2" width="200">
-  <img src="samples/layouts/layout_split_h_2_1.png" alt="Split 2:1" width="200">
+  <img src="https://raw.githubusercontent.com/adrienbrault/geekmagic-hacs/main/samples/layouts/layout_split_horizontal.png" alt="Split Horizontal" width="200">
+  <img src="https://raw.githubusercontent.com/adrienbrault/geekmagic-hacs/main/samples/layouts/layout_split_vertical.png" alt="Split Vertical" width="200">
+  <img src="https://raw.githubusercontent.com/adrienbrault/geekmagic-hacs/main/samples/layouts/layout_split_h_1_2.png" alt="Split 1:2" width="200">
+  <img src="https://raw.githubusercontent.com/adrienbrault/geekmagic-hacs/main/samples/layouts/layout_split_h_2_1.png" alt="Split 2:1" width="200">
 </p>
 
 ### Column & Row Layouts
 
 <p align="center">
-  <img src="samples/layouts/layout_three_column.png" alt="Three Column" width="200">
-  <img src="samples/layouts/layout_three_row.png" alt="Three Row" width="200">
+  <img src="https://raw.githubusercontent.com/adrienbrault/geekmagic-hacs/main/samples/layouts/layout_three_column.png" alt="Three Column" width="200">
+  <img src="https://raw.githubusercontent.com/adrienbrault/geekmagic-hacs/main/samples/layouts/layout_three_row.png" alt="Three Row" width="200">
 </p>
 
 ### Hero Layouts
 
 <p align="center">
-  <img src="samples/layouts/layout_hero.png" alt="Hero" width="200">
-  <img src="samples/layouts/layout_hero_simple.png" alt="Hero Simple" width="200">
-  <img src="samples/layouts/layout_hero_corner_tl.png" alt="Hero TL" width="200">
-  <img src="samples/layouts/layout_hero_corner_tr.png" alt="Hero TR" width="200">
-  <img src="samples/layouts/layout_hero_corner_bl.png" alt="Hero BL" width="200">
-  <img src="samples/layouts/layout_hero_corner_br.png" alt="Hero BR" width="200">
+  <img src="https://raw.githubusercontent.com/adrienbrault/geekmagic-hacs/main/samples/layouts/layout_hero.png" alt="Hero" width="200">
+  <img src="https://raw.githubusercontent.com/adrienbrault/geekmagic-hacs/main/samples/layouts/layout_hero_simple.png" alt="Hero Simple" width="200">
+  <img src="https://raw.githubusercontent.com/adrienbrault/geekmagic-hacs/main/samples/layouts/layout_hero_corner_tl.png" alt="Hero TL" width="200">
+  <img src="https://raw.githubusercontent.com/adrienbrault/geekmagic-hacs/main/samples/layouts/layout_hero_corner_tr.png" alt="Hero TR" width="200">
+  <img src="https://raw.githubusercontent.com/adrienbrault/geekmagic-hacs/main/samples/layouts/layout_hero_corner_bl.png" alt="Hero BL" width="200">
+  <img src="https://raw.githubusercontent.com/adrienbrault/geekmagic-hacs/main/samples/layouts/layout_hero_corner_br.png" alt="Hero BR" width="200">
 </p>
 
 ### Sidebar Layouts
 
 <p align="center">
-  <img src="samples/layouts/layout_sidebar_left.png" alt="Sidebar Left" width="200">
-  <img src="samples/layouts/layout_sidebar_right.png" alt="Sidebar Right" width="200">
+  <img src="https://raw.githubusercontent.com/adrienbrault/geekmagic-hacs/main/samples/layouts/layout_sidebar_left.png" alt="Sidebar Left" width="200">
+  <img src="https://raw.githubusercontent.com/adrienbrault/geekmagic-hacs/main/samples/layouts/layout_sidebar_right.png" alt="Sidebar Right" width="200">
 </p>
 
 ## Themes
@@ -153,14 +153,14 @@ The default `watchOS` theme is inspired by Apple's watchOS Human Interface Guide
 
 | watchOS | Classic | Minimal | Neon | Retro | Soft |
 |:-------:|:-------:|:-------:|:----:|:-----:|:----:|
-| <img src="samples/layouts/layout_theme_watchos.png" alt="watchOS" width="200"> | <img src="samples/layouts/layout_theme_classic.png" alt="Classic" width="200"> | <img src="samples/layouts/layout_theme_minimal.png" alt="Minimal" width="200"> | <img src="samples/layouts/layout_theme_neon.png" alt="Neon" width="200"> | <img src="samples/layouts/layout_theme_retro.png" alt="Retro" width="200"> | <img src="samples/layouts/layout_theme_soft.png" alt="Soft" width="200"> |
+| <img src="https://raw.githubusercontent.com/adrienbrault/geekmagic-hacs/main/samples/layouts/layout_theme_watchos.png" alt="watchOS" width="200"> | <img src="https://raw.githubusercontent.com/adrienbrault/geekmagic-hacs/main/samples/layouts/layout_theme_classic.png" alt="Classic" width="200"> | <img src="https://raw.githubusercontent.com/adrienbrault/geekmagic-hacs/main/samples/layouts/layout_theme_minimal.png" alt="Minimal" width="200"> | <img src="https://raw.githubusercontent.com/adrienbrault/geekmagic-hacs/main/samples/layouts/layout_theme_neon.png" alt="Neon" width="200"> | <img src="https://raw.githubusercontent.com/adrienbrault/geekmagic-hacs/main/samples/layouts/layout_theme_retro.png" alt="Retro" width="200"> | <img src="https://raw.githubusercontent.com/adrienbrault/geekmagic-hacs/main/samples/layouts/layout_theme_soft.png" alt="Soft" width="200"> |
 | **Default** — Apple watchOS HIG-inspired | Subtle card chrome, system colors | Sharp, monochrome | Cyberpunk with glow | Terminal scanlines | Cozy, very rounded |
 
 ### Colored & Light Themes
 
 | Ocean | Sunset | Forest | Light | Candy |
 |:-----:|:------:|:------:|:-----:|:-----:|
-| <img src="samples/layouts/layout_theme_ocean.png" alt="Ocean" width="200"> | <img src="samples/layouts/layout_theme_sunset.png" alt="Sunset" width="200"> | <img src="samples/layouts/layout_theme_forest.png" alt="Forest" width="200"> | <img src="samples/layouts/layout_theme_light.png" alt="Light" width="200"> | <img src="samples/layouts/layout_theme_candy.png" alt="Candy" width="200"> |
+| <img src="https://raw.githubusercontent.com/adrienbrault/geekmagic-hacs/main/samples/layouts/layout_theme_ocean.png" alt="Ocean" width="200"> | <img src="https://raw.githubusercontent.com/adrienbrault/geekmagic-hacs/main/samples/layouts/layout_theme_sunset.png" alt="Sunset" width="200"> | <img src="https://raw.githubusercontent.com/adrienbrault/geekmagic-hacs/main/samples/layouts/layout_theme_forest.png" alt="Forest" width="200"> | <img src="https://raw.githubusercontent.com/adrienbrault/geekmagic-hacs/main/samples/layouts/layout_theme_light.png" alt="Light" width="200"> | <img src="https://raw.githubusercontent.com/adrienbrault/geekmagic-hacs/main/samples/layouts/layout_theme_candy.png" alt="Candy" width="200"> |
 | Deep blue, nautical | Warm coral/orange | Natural earth tones | Clean white background | Playful pastels |
 
 ---
