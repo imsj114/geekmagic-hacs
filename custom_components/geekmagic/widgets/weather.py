@@ -344,10 +344,10 @@ class WeatherDisplay(Component):
     ) -> Component:
         """Roomy square-ish cells: hero temp + meta strip + forecast row.
 
-        The hero temperature auto-scales (``primary`` font) so it fills the
-        cell instead of being pinned to a fixed ``xlarge``. In landscape
-        cells the icon sits beside the temp (using the width); in portrait
-        cells it stacks above (the classic weather look).
+        The hero temperature auto-scales (``huge`` font, shrinking to fit
+        narrow cells). In landscape cells the icon sits beside the temp
+        (using the width); in portrait cells it stacks above (the classic
+        weather look).
         """
         padding = max(4, int(min(width, height) * 0.05))
         side_by_side = width >= height * 1.2
@@ -355,7 +355,7 @@ class WeatherDisplay(Component):
 
         temp_text = Text(
             _temp_str(self.temperature),
-            font="primary",
+            font="huge",
             bold=True,
             color=THEME_TEXT_PRIMARY,
             auto_fit=True,
@@ -384,7 +384,7 @@ class WeatherDisplay(Component):
         meta_strip = Row(children=meta_children, gap=6, align="center", justify="center")
 
         bands: list[Component] = [hero, meta_strip]
-        forecast_row = self._forecast_row(width, height, max(14, int(height * 0.11)))
+        forecast_row = self._forecast_row(width, height, max(18, int(height * 0.17)))
         if forecast_row is not None:
             bands.append(forecast_row)
 
@@ -417,7 +417,7 @@ class WeatherDisplay(Component):
                 Icon(icon_name, size=icon_size, color=icon_tint),
                 Text(
                     _temp_str(self.temperature),
-                    font="primary",
+                    font="huge",
                     bold=True,
                     color=THEME_TEXT_PRIMARY,
                     auto_fit=True,
@@ -451,7 +451,7 @@ class WeatherDisplay(Component):
 
         if self._want_forecast:
             items = self._visible_forecast()[: self.forecast_days]
-            list_icon = max(12, int(width * 0.14))
+            list_icon = max(16, int(width * 0.20))
             forecast_rows = [
                 self._forecast_list_row(day, i, list_icon) for i, day in enumerate(items)
             ]
@@ -526,7 +526,7 @@ class WeatherDisplay(Component):
         # to 3 days and a single temperature — five hi/lo columns collide
         # in the ~half-width slice that's left.
         forecast_row = self._forecast_row(
-            width, height, max(14, int(height * 0.30)), max_days=3, high_only=True
+            width, height, max(18, int(height * 0.42)), max_days=3, high_only=True
         )
         if forecast_row is None:
             return Row(
@@ -559,7 +559,7 @@ class WeatherDisplay(Component):
         """
         padding = max(4, int(width * 0.04))
         icon_size = max(16, min(28, int(height * 0.28)))
-        mini_icon_size = max(10, int(height * 0.18))
+        mini_icon_size = max(14, int(height * 0.24))
         is_wide = width >= 200
 
         top_children: list[Component] = [
