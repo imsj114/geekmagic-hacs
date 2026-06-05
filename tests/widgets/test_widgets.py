@@ -1568,6 +1568,37 @@ class TestWeatherWidget:
         display = WeatherDisplay(temperature=22, condition="sunny", forecast=[])
         assert display._high_low_chips(icon_size=12) == []
 
+    @pytest.mark.parametrize(
+        ("width", "expected"),
+        [
+            (240, 3),  # wide cell — all requested days
+            (108, 3),  # 2x2 / 3x2 grid cell — three day columns fit
+            (69, 2),  # 2x3 / 3x3 grid cell — too narrow, cap at two
+        ],
+    )
+    def test_forecast_days_for_width(self, width, expected):
+        """Narrow cells drop to two forecast columns so labels don't collide."""
+        display = WeatherDisplay(
+            temperature=22, condition="sunny", forecast=self._forecast(), forecast_days=3
+        )
+        assert display._forecast_days_for_width(width) == expected
+
+    def test_forecast_days_for_width_respects_user_cap(self):
+        """The width budget never shows more days than the user configured."""
+        display = WeatherDisplay(
+            temperature=22, condition="sunny", forecast=self._forecast(), forecast_days=1
+        )
+        assert display._forecast_days_for_width(240) == 1
+
+    def test_compact_cell_renders_forecast(self, renderer):
+        """Short grid cells (3x2/3x3) now surface the next-days forecast."""
+        _img, draw = renderer.create_canvas()
+        ctx = RenderContext(draw, (0, 0, 108, 69), renderer)
+        # 108x69 is a compact cell — should render without raising.
+        WeatherDisplay(
+            temperature=22, humidity=45, condition="sunny", forecast=self._forecast()
+        ).render(ctx, 0, 0, 108, 69)
+
 
 class TestClimateWidget:
     """Tests for ClimateWidget."""

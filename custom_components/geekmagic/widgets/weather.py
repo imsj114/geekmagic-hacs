@@ -250,13 +250,20 @@ class WeatherDisplay(Component):
         return self.condition.replace("-", " ").title()
 
     def _forecast_column(
-        self, day: dict, index: int, icon_size: int, high_only: bool = False
+        self,
+        day: dict,
+        index: int,
+        icon_size: int,
+        high_only: bool = False,
+        show_day: bool = True,
     ) -> Component:
         """One vertical forecast cell: ``DAY`` / icon / ``hi°/lo°`` (or ``hi°``).
 
-        ``high_only`` forces a single temperature — used by the wide-short
-        strip where each column shares a tight slice of the cell width and
-        ``"26°/14°"`` would collide with its neighbours.
+        ``high_only`` forces a single temperature — used by narrow cells
+        where each column shares a tight slice of the cell width and
+        ``"26°/14°"`` would collide with its neighbours. ``show_day`` drops
+        the weekday caption for very short cells where there's no vertical
+        room for three bands.
         """
         day_condition = day.get("condition", "sunny")
         day_icon = WEATHER_ICONS.get(day_condition, "weather-sunny")
@@ -270,16 +277,27 @@ class WeatherDisplay(Component):
         else:
             temp_text = _temp_str(day_temp)
 
-        return Column(
-            children=[
-                Text(day_name.upper(), font="tiny", color=THEME_TEXT_SECONDARY),
-                Icon(day_icon, size=icon_size, color=day_tint),
-                Text(temp_text, font="tiny", bold=True, color=THEME_TEXT_PRIMARY, auto_fit=True),
-            ],
-            gap=2,
-            align="center",
-            justify="center",
+        children: list[Component] = []
+        if show_day:
+            children.append(Text(day_name.upper(), font="tiny", color=THEME_TEXT_SECONDARY))
+        children.append(Icon(day_icon, size=icon_size, color=day_tint))
+        children.append(
+            Text(temp_text, font="tiny", bold=True, color=THEME_TEXT_PRIMARY, auto_fit=True)
         )
+        return Column(children=children, gap=2, align="center", justify="center")
+
+    def _forecast_days_for_width(self, width: int) -> int:
+        """How many forecast columns fit a cell of the given width.
+
+        Each ``DAY  26°`` column needs ~44 px to stay legible; below that
+        we drop to two so labels and temps don't collide (a 3x3 grid cell
+        is only ~70 px wide).
+        """
+        if width >= 200:
+            return self.forecast_days
+        if width >= 104:
+            return min(self.forecast_days, 3)
+        return min(self.forecast_days, 2)
 
     def _forecast_row(
         self,
@@ -288,6 +306,7 @@ class WeatherDisplay(Component):
         icon_size: int,
         max_days: int | None = None,
         high_only: bool = False,
+        show_day: bool = True,
     ) -> Component | None:
         """Horizontal strip of forecast columns, or ``None`` when not shown."""
         if not self._want_forecast:
@@ -297,14 +316,15 @@ class WeatherDisplay(Component):
         if not items:
             return None
         columns = [
-            self._forecast_column(day, i, icon_size, high_only=high_only)
+            self._forecast_column(day, i, icon_size, high_only=high_only, show_day=show_day)
             for i, day in enumerate(items)
         ]
         return Row(children=columns, gap=0, align="center", justify="space-around")
 
     def _forecast_list_row(self, day: dict, index: int, icon_size: int) -> Component:
         """One horizontal forecast row for the vertical layout:
-        ``DAY  [icon]`` on the left, ``hi°  lo°`` pinned right.
+        ``DAY`` pinned left, then ``[icon] hi° lo°`` grouped on the right so
+        the condition icon sits directly beside the temperature it belongs to.
         """
         day_condition = day.get("condition", "sunny")
         day_icon = WEATHER_ICONS.get(day_condition, "weather-sunny")
@@ -314,7 +334,8 @@ class WeatherDisplay(Component):
         day_name = _parse_forecast_day_name(day.get("datetime", ""), f"D{index + 1}")
 
         right: list[Component] = [
-            Text(_temp_str(day_temp), font="tiny", bold=True, color=THEME_TEXT_PRIMARY)
+            Icon(day_icon, size=icon_size, color=day_tint),
+            Text(_temp_str(day_temp), font="tiny", bold=True, color=THEME_TEXT_PRIMARY),
         ]
         if self.show_high_low and day_low is not None:
             right.append(Text(_temp_str(day_low), font="tiny", color=THEME_TEXT_TERTIARY))
@@ -322,7 +343,6 @@ class WeatherDisplay(Component):
         return Row(
             children=[
                 Text(day_name.upper(), font="tiny", color=THEME_TEXT_SECONDARY, align="start"),
-                Icon(day_icon, size=icon_size, color=day_tint),
                 Spacer(),
                 Row(children=right, gap=4, align="center", justify="end"),
             ],
@@ -383,14 +403,25 @@ class WeatherDisplay(Component):
             meta_children.append(Text(f"{self.humidity}%", font="tiny", color=THEME_INFO))
         meta_strip = Row(children=meta_children, gap=6, align="center", justify="center")
 
-        bands: list[Component] = [hero, meta_strip]
+        # Group the current-conditions block (hero + meta) so the outer
+        # column has just two bands — current vs forecast — and
+        # ``space-evenly`` opens a clear gap between the top and bottom
+        # rather than spreading three bands evenly tight together.
+        top_block = Column(
+            children=[hero, meta_strip],
+            gap=int(height * 0.015),
+            align="center",
+            justify="center",
+        )
+
+        bands: list[Component] = [top_block]
         forecast_row = self._forecast_row(width, height, max(18, int(height * 0.17)))
         if forecast_row is not None:
             bands.append(forecast_row)
 
         return Column(
             children=bands,
-            gap=int(height * 0.03),
+            gap=int(height * 0.06),
             padding=padding,
             align="stretch",
             justify="space-evenly",
@@ -451,7 +482,7 @@ class WeatherDisplay(Component):
 
         if self._want_forecast:
             items = self._visible_forecast()[: self.forecast_days]
-            list_icon = max(16, int(width * 0.20))
+            list_icon = max(19, int(width * 0.24))
             forecast_rows = [
                 self._forecast_list_row(day, i, list_icon) for i, day in enumerate(items)
             ]
@@ -550,23 +581,34 @@ class WeatherDisplay(Component):
         icon_name: str,
         icon_tint: Color,
     ) -> Component:
-        """Medium cells: icon + temp on top, mini forecast on the bottom.
+        """Medium cells: icon + temp on top, day+temp forecast below.
 
-        Wide cells (>= 200 px) also show condition + humidity on the top
-        row and day labels + temps in the forecast. Narrow grid squares
-        keep the top row to icon + temp and the forecast to icons only so
-        text never collides.
+        Wide cells (>= 200 px) get a larger top line (icon + temp +
+        condition + humidity) and a 3-day hi/lo forecast. Narrow grid
+        squares show a single-temp forecast whose column count adapts to
+        the width (two columns in a tight 3x3-style cell, three when there
+        is room) so day labels and temps never collide.
         """
         padding = max(4, int(width * 0.04))
-        icon_size = max(16, min(28, int(height * 0.28)))
-        mini_icon_size = max(14, int(height * 0.24))
         is_wide = width >= 200
+
+        # Request: the wide (2x1-style) top line reads bigger — bump both
+        # the icon and the temperature ~30%.
+        if is_wide:
+            icon_size = max(20, min(40, int(height * 0.40)))
+            temp_font = "xlarge"
+            meta_font = "small"
+        else:
+            icon_size = max(16, min(28, int(height * 0.28)))
+            temp_font = "large"
+            meta_font = "tiny"
+        mini_icon_size = max(14, int(height * 0.24))
 
         top_children: list[Component] = [
             Icon(icon_name, size=icon_size, color=icon_tint),
             Text(
                 _temp_str(self.temperature),
-                font="large",
+                font=temp_font,
                 bold=True,
                 color=THEME_TEXT_PRIMARY,
                 auto_fit=True,
@@ -574,43 +616,26 @@ class WeatherDisplay(Component):
         ]
         if is_wide:
             top_children.append(
-                Text(self._condition_label(), font="tiny", color=THEME_TEXT_SECONDARY)
+                Text(self._condition_label(), font=meta_font, color=THEME_TEXT_SECONDARY)
             )
             if self.show_humidity and self.humidity != "--":
-                top_children.append(Text(f"{self.humidity}%", font="tiny", color=THEME_INFO))
+                top_children.append(Text(f"{self.humidity}%", font=meta_font, color=THEME_INFO))
         top_row = Row(children=top_children, gap=6, align="center", justify="center")
 
-        bottom_row: Component | None = None
-        forecast_items = (
-            self._visible_forecast()[: min(3, self.forecast_days)] if self._want_forecast else []
-        )
-        if forecast_items:
-            if is_wide:
-                bottom_row = Row(
-                    children=[
-                        self._forecast_column(day, i, mini_icon_size)
-                        for i, day in enumerate(forecast_items)
-                    ],
-                    gap=0,
-                    align="center",
-                    justify="space-around",
-                )
-            else:
-                forecast_icons: list[Component] = []
-                for day in forecast_items:
-                    day_condition = day.get("condition", "sunny")
-                    day_icon = WEATHER_ICONS.get(day_condition, "weather-sunny")
-                    day_tint = WEATHER_ROLES.get(day_condition, THEME_WARNING)
-                    forecast_icons.append(Icon(day_icon, size=mini_icon_size, color=day_tint))
-                bottom_row = Row(
-                    children=forecast_icons,
-                    gap=int(width * 0.06),
-                    align="center",
-                    justify="center",
-                )
+        if is_wide:
+            bottom_row = self._forecast_row(width, height, mini_icon_size)
+        else:
+            # Narrow cells: day + single temp, column count scaled to width.
+            bottom_row = self._forecast_row(
+                width,
+                height,
+                mini_icon_size,
+                max_days=self._forecast_days_for_width(width),
+                high_only=True,
+            )
 
         children: list[Component] = [top_row]
-        if bottom_row:
+        if bottom_row is not None:
             children.append(bottom_row)
 
         return Column(
@@ -628,14 +653,54 @@ class WeatherDisplay(Component):
         icon_name: str,
         icon_tint: Color,
     ) -> Component:
-        """Compact weather layout."""
-        padding = int(width * 0.04)
+        """Compact weather layout for short grid cells.
+
+        When a forecast is available and the cell has any room, show a small
+        icon + temp current line over a 2-3 day mini forecast (icons +
+        temps, weekday captions only when tall enough). Otherwise fall back
+        to the icon + temp (+ humidity) glance.
+        """
+        padding = max(2, int(min(width, height) * 0.05))
+
+        if self._want_forecast and width >= 70 and height >= 58:
+            top_icon = max(14, min(30, int(height * 0.34)))
+            top_row = Row(
+                children=[
+                    Icon(icon_name, size=top_icon, color=icon_tint),
+                    Text(
+                        _temp_str(self.temperature),
+                        font="large",
+                        bold=True,
+                        color=THEME_TEXT_PRIMARY,
+                        auto_fit=True,
+                    ),
+                ],
+                gap=4,
+                align="center",
+                justify="center",
+            )
+            forecast_row = self._forecast_row(
+                width,
+                height,
+                max(14, int(height * 0.26)),
+                max_days=self._forecast_days_for_width(width),
+                high_only=True,
+                show_day=height >= 86,
+            )
+            children: list[Component] = [top_row]
+            if forecast_row is not None:
+                children.append(forecast_row)
+            return Column(
+                children=children,
+                gap=int(height * 0.04),
+                padding=padding,
+                align="stretch",
+                justify="space-evenly",
+            )
+
+        # Glance fallback: icon left, temp (+ humidity) right.
         icon_size = max(16, min(32, int(height * 0.40)))
-
-        # Left side: icon (tinted by condition)
         left_side = Icon(icon_name, size=icon_size, color=icon_tint)
-
-        # Right side: temperature and optionally humidity
         right_children: list[Component] = [
             Text(
                 _temp_str(self.temperature),
@@ -646,19 +711,16 @@ class WeatherDisplay(Component):
                 auto_fit=True,
             )
         ]
-
         if self.show_humidity:
             right_children.append(
                 Text(f"{self.humidity}%", font="tiny", color=THEME_INFO, align="end")
             )
-
         right_side = Column(
             children=right_children,
             gap=int(height * 0.08),
             align="end",
             justify="center",
         )
-
         return Row(
             children=[left_side, right_side],
             gap=padding,
