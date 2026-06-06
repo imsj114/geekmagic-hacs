@@ -370,8 +370,8 @@ def generate_widget_sizes(renderer: Renderer, output_dir: Path) -> None:
     # Weather entities (different cities + conditions). Temperatures are
     # floats like a real weather integration reports them: current temps
     # carry a sensor-style decimal, while daily forecast hi/lo are a natural
-    # mix of whole (26.0) and fractional (23.5) values. Whole-number floats
-    # render without the trailing ``.0`` on every number except the hero.
+    # mix of whole (26.0) and fractional (23.5) values. Only the hero temp
+    # keeps decimals; every secondary number is rounded to a whole integer.
     weather_variants = [
         (
             "weather.home",
@@ -379,7 +379,7 @@ def generate_widget_sizes(renderer: Renderer, output_dir: Path) -> None:
             "Paris",
             24.3,
             45,
-            [("sunny", 26.0, 17.0), ("cloudy", 23.5, 15.0), ("rainy", 19.0, 12.5)],
+            [("sunny", 26.0, 17.0), ("cloudy", 23.7, 15.0), ("rainy", 19.0, 12.3)],
         ),
         (
             "weather.london",
@@ -387,7 +387,7 @@ def generate_widget_sizes(renderer: Renderer, output_dir: Path) -> None:
             "London",
             13.8,
             82,
-            [("rainy", 15.0, 9.0), ("cloudy", 16.5, 10.0), ("partlycloudy", 18.0, 11.5)],
+            [("rainy", 15.0, 9.0), ("cloudy", 16.8, 10.0), ("partlycloudy", 18.0, 11.2)],
         ),
         (
             "weather.tokyo",
@@ -395,7 +395,7 @@ def generate_widget_sizes(renderer: Renderer, output_dir: Path) -> None:
             "Tokyo",
             19.1,
             60,
-            [("cloudy", 20.0, 14.0), ("sunny", 22.5, 15.0), ("sunny", 24.0, 16.5)],
+            [("cloudy", 20.0, 14.0), ("sunny", 22.6, 15.0), ("sunny", 24.0, 16.2)],
         ),
         (
             "weather.sydney",
@@ -403,7 +403,7 @@ def generate_widget_sizes(renderer: Renderer, output_dir: Path) -> None:
             "Sydney",
             27.4,
             55,
-            [("partlycloudy", 28.0, 20.0), ("sunny", 30.5, 21.0), ("sunny", 31.0, 22.5)],
+            [("partlycloudy", 28.0, 20.0), ("sunny", 30.7, 21.0), ("sunny", 31.0, 22.3)],
         ),
         (
             "weather.nyc",
@@ -411,7 +411,7 @@ def generate_widget_sizes(renderer: Renderer, output_dir: Path) -> None:
             "New York",
             -2.2,
             70,
-            [("snowy", -1.0, -6.0), ("snowy", 0.0, -4.5), ("cloudy", 3.0, -2.0)],
+            [("snowy", -1.0, -6.0), ("snowy", 0.0, -4.3), ("cloudy", 3.0, -2.0)],
         ),
         (
             "weather.dubai",
@@ -419,7 +419,7 @@ def generate_widget_sizes(renderer: Renderer, output_dir: Path) -> None:
             "Dubai",
             38.6,
             20,
-            [("sunny", 39.0, 28.0), ("sunny", 40.5, 29.0), ("sunny", 38.0, 27.5)],
+            [("sunny", 39.0, 28.0), ("sunny", 40.6, 29.0), ("sunny", 38.0, 27.4)],
         ),
         (
             "weather.berlin",
@@ -427,7 +427,7 @@ def generate_widget_sizes(renderer: Renderer, output_dir: Path) -> None:
             "Berlin",
             8.4,
             88,
-            [("fog", 9.0, 4.0), ("cloudy", 11.5, 5.0), ("rainy", 10.0, 6.5)],
+            [("fog", 9.0, 4.0), ("cloudy", 11.8, 5.0), ("rainy", 10.0, 6.2)],
         ),
         (
             "weather.rio",
@@ -435,7 +435,7 @@ def generate_widget_sizes(renderer: Renderer, output_dir: Path) -> None:
             "Rio",
             29.2,
             75,
-            [("lightning-rainy", 30.0, 23.0), ("rainy", 28.5, 22.0), ("partlycloudy", 27.0, 21.5)],
+            [("lightning-rainy", 30.0, 23.0), ("rainy", 28.6, 22.0), ("partlycloudy", 27.0, 21.3)],
         ),
         (
             "weather.oslo",
@@ -443,7 +443,7 @@ def generate_widget_sizes(renderer: Renderer, output_dir: Path) -> None:
             "Oslo",
             3.1,
             65,
-            [("partlycloudy", 4.0, -1.0), ("snowy", 1.5, -3.0), ("snowy", -1.0, -5.5)],
+            [("partlycloudy", 4.0, -1.0), ("snowy", 1.7, -3.0), ("snowy", -1.0, -5.3)],
         ),
     ]
     base_dates = [f"2024-01-{day:02d}" for day in (15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26)]
@@ -2322,14 +2322,14 @@ def generate_layout_samples(renderer: Renderer, output_dir: Path) -> None:
                 {
                     "datetime": "2024-01-16",
                     "condition": "cloudy",
-                    "temperature": 23.5,
+                    "temperature": 23.7,
                     "templow": 15.0,
                 },
                 {
                     "datetime": "2024-01-17",
                     "condition": "rainy",
                     "temperature": 19.0,
-                    "templow": 12.5,
+                    "templow": 12.3,
                 },
             ],
         },

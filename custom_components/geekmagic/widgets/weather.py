@@ -116,14 +116,17 @@ def _parse_forecast_day_name(datetime_str: str, fallback: str) -> str:
 
 
 def _fmt_num(value: Any) -> Any:
-    """Drop a redundant trailing ``.0`` from a number.
+    """Round a number to a whole integer for compact secondary display.
 
-    ``22.0`` -> ``22`` while ``22.5`` stays ``22.5``; non-floats (ints,
-    ``"--"``, ``None``) pass through untouched. Used for every weather
-    number except the hero temperature, which keeps its full precision.
+    Forecast temps, hi/lo chips and humidity show no decimals at all
+    (``22.6`` -> ``23``, ``14.0`` -> ``14``); non-numbers (``"--"``,
+    ``None``) pass through untouched. The hero/top temperature keeps its
+    full precision and never goes through this helper.
     """
-    if isinstance(value, float) and value.is_integer():
-        return int(value)
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return round(value)
     return value
 
 

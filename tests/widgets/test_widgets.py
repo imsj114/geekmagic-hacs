@@ -1574,35 +1574,34 @@ class TestWeatherWidget:
 
     @pytest.mark.parametrize(
         ("value", "expected"),
-        [(26.0, 26), (14.5, 14.5), (45, 45), ("--", "--"), (None, None)],
+        [(26.0, 26), (22.6, 23), (22.4, 22), (45, 45), ("--", "--"), (None, None)],
     )
     def test_fmt_num(self, value, expected):
-        """``_fmt_num`` drops a redundant ``.0`` but keeps real fractions."""
+        """``_fmt_num`` rounds numbers to whole integers for secondary display."""
         assert _fmt_num(value) == expected
 
-    def test_high_low_chips_drop_trailing_zero(self):
-        """Secondary numbers (hi/lo chips) drop a redundant ``.0``."""
-        forecast = [{"datetime": "2025-12-29T00:00:00", "temperature": 26.0, "templow": 14.0}]
+    def test_high_low_chips_round_to_integer(self):
+        """Secondary numbers (hi/lo chips) round and show no decimals."""
+        forecast = [{"datetime": "2025-12-29T00:00:00", "temperature": 26.4, "templow": 13.6}]
         display = WeatherDisplay(temperature=22, condition="sunny", forecast=forecast)
         texts = [c.text for c in display._high_low_chips(icon_size=12) if hasattr(c, "text")]
         assert "26°" in texts
         assert "14°" in texts
-        assert "26.0°" not in texts
-        assert "14.0°" not in texts
+        assert not any("." in t for t in texts)
 
-    def test_forecast_list_row_drops_trailing_zero(self):
-        """Vertical-layout forecast temps drop a redundant ``.0``."""
-        day = {"datetime": "2025-12-29T00:00:00", "temperature": 26.0, "templow": 14.0}
+    def test_forecast_list_row_rounds_to_integer(self):
+        """Vertical-layout forecast temps round and show no decimals."""
+        day = {"datetime": "2025-12-29T00:00:00", "temperature": 26.4, "templow": 13.6}
         display = WeatherDisplay(temperature=22, condition="sunny", forecast=[day])
         row = display._forecast_list_row(day, 0, icon_size=16)
         texts = _collect_texts(row)
         assert "26°" in texts
         assert "14°" in texts
-        assert not any(t.endswith(".0°") for t in texts)
+        assert not any("." in t for t in texts)
 
-    def test_forecast_column_drops_trailing_zero(self):
-        """Horizontal-layout forecast columns drop a redundant ``.0``."""
-        day = {"datetime": "2025-12-29T00:00:00", "temperature": 26.0, "templow": 14.0}
+    def test_forecast_column_rounds_to_integer(self):
+        """Horizontal-layout forecast columns round and show no decimals."""
+        day = {"datetime": "2025-12-29T00:00:00", "temperature": 26.4, "templow": 13.6}
         display = WeatherDisplay(temperature=22, condition="sunny", forecast=[day])
         col = display._forecast_column(day, 0, icon_size=16)
         texts = _collect_texts(col)
