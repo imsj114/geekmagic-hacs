@@ -563,48 +563,51 @@ def generate_widget_sizes(renderer: Renderer, output_dir: Path) -> None:
     media_album_art = create_fake_album_art(300)
 
     # Variant tables — each slot picks a different entry by `slot % len`.
+    # Roughly half of each variant table uses a longer, realistic label
+    # (interleaved with short ones) so the generated grids exercise the
+    # two-line caption wrapping alongside single-line captions.
     gauge_variants = [
-        ("sensor.cpu", "CPU", COLOR_CYAN, "chip"),
+        ("sensor.cpu", "CPU Usage", COLOR_CYAN, "chip"),
         ("sensor.memory", "RAM", COLOR_PURPLE, "memory"),
-        ("sensor.disk", "Disk", COLOR_ORANGE, "harddisk"),
+        ("sensor.disk", "Disk Storage", COLOR_ORANGE, "harddisk"),
         ("sensor.gpu", "GPU", COLOR_LIME, "chip"),
-        ("sensor.battery_phone", "Batt", COLOR_YELLOW, "battery"),
-        ("sensor.network", "Net", COLOR_TEAL, "wifi"),
-        ("sensor.fan", "Fan", COLOR_GRAY, "fan"),
-        ("sensor.power", "Pwr", COLOR_RED, "flash"),
-        ("sensor.brightness", "Brt", COLOR_GOLD, "brightness"),
+        ("sensor.battery_phone", "Battery Level", COLOR_YELLOW, "battery"),
+        ("sensor.network", "Network", COLOR_TEAL, "wifi"),
+        ("sensor.fan", "Cooling Fan", COLOR_GRAY, "fan"),
+        ("sensor.power", "Power", COLOR_RED, "flash"),
+        ("sensor.brightness", "Brightness", COLOR_GOLD, "brightness"),
     ]
     sensor_variants = [
-        ("sensor.temp", "Temp", COLOR_ORANGE, "thermometer"),
+        ("sensor.temp", "Temperature", COLOR_ORANGE, "thermometer"),
         ("sensor.humidity", "Humidity", COLOR_CYAN, "water-percent"),
-        ("sensor.pressure", "Pressure", COLOR_PURPLE, "gauge"),
+        ("sensor.pressure", "Air Pressure", COLOR_PURPLE, "gauge"),
         ("sensor.wind", "Wind", COLOR_TEAL, "weather-windy"),
-        ("sensor.uv", "UV", COLOR_YELLOW, "weather-sunny"),
-        ("sensor.aqi", "AQI", COLOR_LIME, "leaf"),
+        ("sensor.uv", "UV Index", COLOR_YELLOW, "weather-sunny"),
+        ("sensor.aqi", "Air Quality", COLOR_LIME, "leaf"),
         ("sensor.co2", "CO2", COLOR_GRAY, "molecule-co2"),
-        ("sensor.lux", "Light", COLOR_GOLD, "white-balance-sunny"),
+        ("sensor.lux", "Illuminance", COLOR_GOLD, "white-balance-sunny"),
         ("sensor.noise", "Noise", COLOR_RED, "volume-high"),
     ]
     progress_variants = [
-        ("sensor.steps", "Steps", COLOR_LIME, "heart", 10000),
+        ("sensor.steps", "Daily Steps", COLOR_LIME, "heart", 10000),
         ("sensor.calories", "Calories", COLOR_RED, "fire", 2400),
-        ("sensor.water", "Water", COLOR_CYAN, "cup-water", 8),
+        ("sensor.water", "Water Intake", COLOR_CYAN, "cup-water", 8),
         ("sensor.sleep", "Sleep", COLOR_PURPLE, "sleep", 8),
         ("sensor.distance", "Distance", COLOR_ORANGE, "run", 10),
-        ("sensor.active_min", "Active", COLOR_YELLOW, "run-fast", 60),
+        ("sensor.active_min", "Active Minutes", COLOR_YELLOW, "run-fast", 60),
         ("sensor.floors", "Floors", COLOR_TEAL, "stairs", 20),
         ("sensor.workouts", "Workouts", COLOR_GOLD, "dumbbell", 5),
-        ("sensor.read_pages", "Reading", COLOR_GRAY, "book-open", 100),
+        ("sensor.read_pages", "Pages Read", COLOR_GRAY, "book-open", 100),
     ]
     status_variants = [
-        ("binary_sensor.door", "Door", COLOR_LIME, "lock"),
+        ("binary_sensor.door", "Front Door", COLOR_LIME, "lock"),
         ("binary_sensor.window", "Window", COLOR_CYAN, "window-closed"),
-        ("binary_sensor.motion", "Motion", COLOR_ORANGE, "motion-sensor"),
+        ("binary_sensor.motion", "Motion Sensor", COLOR_ORANGE, "motion-sensor"),
         ("binary_sensor.lock", "Lock", COLOR_PURPLE, "lock"),
-        ("binary_sensor.garage", "Garage", COLOR_YELLOW, "garage"),
+        ("binary_sensor.garage", "Garage Door", COLOR_YELLOW, "garage"),
         ("binary_sensor.smoke", "Smoke", COLOR_RED, "smoke-detector"),
-        ("binary_sensor.leak", "Leak", COLOR_TEAL, "water"),
-        ("binary_sensor.presence", "Home", COLOR_GOLD, "home"),
+        ("binary_sensor.leak", "Water Leak", COLOR_TEAL, "water"),
+        ("binary_sensor.presence", "Presence", COLOR_GOLD, "home"),
         ("binary_sensor.gas", "Gas", COLOR_GRAY, "fire"),
     ]
     weather_entities = [
@@ -624,13 +627,13 @@ def generate_widget_sizes(renderer: Renderer, output_dir: Path) -> None:
     finance_entity_variants = [
         ("sensor.btc", "Bitcoin"),
         ("sensor.eth", "Ethereum"),
-        ("sensor.aapl", "Apple"),
+        ("sensor.aapl", "Apple Inc."),
         ("sensor.tsla", "Tesla"),
         ("sensor.gold", "Gold"),
-        ("sensor.sp500", "S&P 500"),
-        ("sensor.nasdaq", "Nasdaq"),
+        ("sensor.sp500", "S&P 500 Index"),
+        ("sensor.nasdaq", "Nasdaq Composite"),
         ("sensor.eur_usd", "EUR/USD"),
-        ("sensor.oil", "Oil"),
+        ("sensor.oil", "Crude Oil"),
     ]
     text_variants = [
         ("Hello", COLOR_CYAN),
