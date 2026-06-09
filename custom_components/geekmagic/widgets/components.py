@@ -130,6 +130,9 @@ class Text(Component):
     - THEME_TEXT_SECONDARY for labels/secondary text (resolves to theme.text_secondary)
 
     When truncate=True, text that exceeds available width is truncated with ellipsis.
+    When wrap=True, over-wide text flows onto up to ``max_lines`` lines instead
+    (``wrap`` takes precedence over ``truncate``); if the wrapped block is too
+    tall for the available height, it falls back to a single truncated line.
     """
 
     text: str
@@ -162,24 +165,45 @@ class Text(Component):
             return list(self._FONT_SHRINK_CHAIN[idx:])
         return [self.font, "small", "tiny"]
 
-    def _pick_font(self, ctx: RenderContext, max_width: int):
+    def _pick_font(self, ctx: RenderContext, max_width: int, max_height: int | None = None):
         """Return the largest font in the shrink chain that fits the text.
 
         When ``wrap`` is enabled a font "fits" if the text can be laid out
         across at most ``max_lines`` lines without truncation — so a long
         label keeps a readable size on two lines instead of shrinking to a
-        tiny single line.
+        tiny single line. The wrapped block must also fit ``max_height``
+        (when given), so the chain keeps shrinking instead of overflowing
+        the cell vertically.
         """
         chain = self._resolved_font_chain()
         for name in chain:
             f = ctx.get_font(name, bold=self.bold)
             if self.wrap:
-                _lines, fits = self._wrap(ctx, f, max_width)
+                _lines, fits = self._layout_lines(ctx, f, max_width, max_height)
                 if fits:
                     return f
             elif ctx.get_text_size(self.text, f)[0] <= max_width:
                 return f
         return ctx.get_font(chain[-1], bold=self.bold)
+
+    def _layout_lines(
+        self, ctx: RenderContext, font, max_width: int, max_height: int | None
+    ) -> tuple[list[str], bool]:
+        """Wrap within ``max_width``, then enforce the vertical budget.
+
+        ``Column`` lays children out at their measured heights, so a wrapped
+        block taller than ``max_height`` would collide with neighbouring
+        bands. In that case fall back to a single truncated line (which
+        reports ``fits=False`` so an auto-fit chain keeps shrinking).
+        """
+        lines, fits = self._wrap(ctx, font, max_width)
+        if len(lines) > 1 and max_height is not None:
+            line_h = self._line_height(ctx, font)
+            gap = self._line_gap(line_h)
+            block_h = line_h * len(lines) + gap * (len(lines) - 1)
+            if block_h > max_height:
+                return [ctx.truncate_to_width(self.text, font, max_width)], False
+        return lines, fits
 
     def _wrap(self, ctx: RenderContext, font, max_width: int) -> tuple[list[str], bool]:
         """Word/char-wrap ``text`` to at most ``max_lines`` lines.
@@ -271,17 +295,25 @@ class Text(Component):
         """Vertical gap between wrapped lines."""
         return max(1, line_height // 6)
 
+    @staticmethod
+    def _line_height(ctx: RenderContext, font) -> int:
+        """Reference line height for wrapped blocks.
+
+        Measured from "Ag" (ascender + descender) so measure() and render()
+        budget the same height regardless of which glyphs each line contains.
+        """
+        return ctx.get_text_size("Ag", font)[1]
+
     def measure(self, ctx: RenderContext, max_width: int, max_height: int) -> tuple[int, int]:
         if self.auto_fit:
-            font = self._pick_font(ctx, max_width)
+            font = self._pick_font(ctx, max_width, max_height)
         else:
             font = ctx.get_font(self.font, bold=self.bold)
         if self.wrap:
-            lines, _ = self._wrap(ctx, font, max_width)
+            lines, _ = self._layout_lines(ctx, font, max_width, max_height)
             if len(lines) > 1:
-                sizes = [ctx.get_text_size(line, font) for line in lines]
-                w = max(s[0] for s in sizes)
-                line_h = max(s[1] for s in sizes)
+                w = max(ctx.get_text_size(line, font)[0] for line in lines)
+                line_h = self._line_height(ctx, font)
                 gap = self._line_gap(line_h)
                 n = len(lines)
                 return (w, line_h * n + gap * (n - 1))
@@ -289,14 +321,14 @@ class Text(Component):
 
     def render(self, ctx: RenderContext, x: int, y: int, width: int, height: int) -> None:
         if self.auto_fit:
-            font = self._pick_font(ctx, width)
+            font = self._pick_font(ctx, width, height)
         else:
             font = ctx.get_font(self.font, bold=self.bold)
         anchor_map = {"start": "lm", "center": "mm", "end": "rm", "stretch": "mm"}
         anchor = anchor_map.get(self.align, "mm")
 
         if self.wrap:
-            lines, _ = self._wrap(ctx, font, width)
+            lines, _ = self._layout_lines(ctx, font, width, height)
         else:
             # Apply truncation if enabled
             display_text = self.text
@@ -319,7 +351,7 @@ class Text(Component):
             return
 
         # Center the stacked block of lines vertically within the box.
-        line_h = ctx.get_text_size("Ag", font)[1]
+        line_h = self._line_height(ctx, font)
         gap = self._line_gap(line_h)
         n = len(lines)
         block_h = line_h * n + gap * (n - 1)

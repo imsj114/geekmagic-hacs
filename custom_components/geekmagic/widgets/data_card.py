@@ -286,7 +286,6 @@ class DataCard(Component):
             (self.caption or "").upper(),
             font="tertiary",
             color=THEME_TEXT_SECONDARY,
-            truncate=True,
             auto_fit=True,
             wrap=True,
         )
@@ -465,7 +464,6 @@ class DataCard(Component):
                         (self.caption or "").upper(),
                         font="secondary",
                         color=THEME_TEXT_SECONDARY,
-                        truncate=True,
                         auto_fit=True,
                         wrap=True,
                     )

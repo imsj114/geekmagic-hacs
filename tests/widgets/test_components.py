@@ -478,6 +478,21 @@ class TestTextWrap:
         text.render(ctx, 0, 0, 80, 60)
         assert ctx.draw_text.call_count == 1
 
+    def test_render_falls_back_to_single_line_when_box_too_short(self) -> None:
+        ctx = self._ctx(line_h=10)
+        # Two lines need 21px; a 12px box can't take them — Column lays
+        # children out at measured height, so overflowing would collide
+        # with neighbouring bands. Expect one truncated line instead.
+        text = Text("TEMPERATURE", wrap=True)
+        text.render(ctx, 0, 0, 80, 12)
+        assert ctx.draw_text.call_count == 1
+
+    def test_measure_falls_back_to_single_line_when_box_too_short(self) -> None:
+        ctx = self._ctx(line_h=10)
+        text = Text("TEMPERATURE", wrap=True)
+        _w, h = text.measure(ctx, max_width=80, max_height=12)
+        assert h == 10
+
 
 class TestAdaptiveMeasure:
     """Adaptive.measure must report the same dimensions it will render at.
