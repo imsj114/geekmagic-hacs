@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 from urllib.parse import urlparse
 
 import aiohttp
@@ -86,12 +87,19 @@ class DeviceTransport:
         """Fetch a JSON object from the device."""
         session = await self.get_session()
         kwargs = {"timeout": request_timeout} if request_timeout is not None else {}
-        async with session.get(f"{self.base_url}{path}", **kwargs) as response:
-            response.raise_for_status()
-            data = await response.json(content_type=None)
-            if not isinstance(data, dict):
-                raise TypeError(f"Expected JSON object from {path}")
-            return data
+        try:
+            async with session.get(f"{self.base_url}{path}", **kwargs) as response:
+                response.raise_for_status()
+                data = await response.json(content_type=None)
+        except aiohttp.ClientResponseError as err:
+            if self.is_malformed_firmware_response(err):
+                raw = await self.raw_http_get(path)
+                data = json.loads(raw.decode(errors="replace"))
+            else:
+                raise
+        if not isinstance(data, dict):
+            raise TypeError(f"Expected JSON object from {path}")
+        return data
 
     async def get_text(self, path: str) -> str:
         """Fetch text from the device."""
