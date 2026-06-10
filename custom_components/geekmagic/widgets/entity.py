@@ -57,6 +57,7 @@ class EntityWidget(Widget):
                 "min": 0,
                 "max": 5,
             },
+            {"key": "attribute", "type": "text", "label": "Entity Attribute"},
         ],
     }
 

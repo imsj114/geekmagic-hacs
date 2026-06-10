@@ -2053,6 +2053,17 @@ class TestEntityWidgetAttribute:
         # Should show placeholder for missing attribute
         assert value == "--", f"Expected '--' but got '{value}'"
 
+    def test_attribute_in_schema(self):
+        """Attribute option is exposed in the schema so the panel editor
+        offers the field (issue #91 — the render path already existed)."""
+        option = next(
+            (o for o in EntityWidget.SCHEMA["options"] if o["key"] == "attribute"),
+            None,
+        )
+        assert option is not None
+        assert option["type"] == "text"
+        assert option["label"] == "Entity Attribute"
+
 
 class TestAttributeListWidget:
     """Tests for AttributeListWidget (issue #38)."""
