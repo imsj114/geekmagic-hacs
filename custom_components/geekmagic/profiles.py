@@ -106,6 +106,7 @@ class FirmwareProfile:
     user_warnings: tuple[str, ...] = ()
     supports_rendered_dashboard = False
     requires_managed_album = False
+    supports_reboot = True
 
     def __init__(
         self,
@@ -138,6 +139,7 @@ class FirmwareProfile:
             brightness_range=self.brightness_range,
             user_warnings=self.user_warnings,
             requires_managed_album=self.requires_managed_album,
+            supports_reboot=self.supports_reboot,
         )
 
     @property
@@ -553,6 +555,7 @@ class SdProProfile(FirmwareProfile):
     display_mechanism = "photo_slideshow"
     brightness_range = (2, 99)
     supports_rendered_dashboard = True
+    supports_reboot = False
     user_warnings = ("This firmware displays rendered dashboards through the Photo slideshow.",)
 
     async def get_state(self) -> DeviceState:
@@ -584,6 +587,10 @@ class SdProProfile(FirmwareProfile):
             "brightness update",
         )
         _LOGGER.debug("Set SD_PRO brightness to %d", value)
+
+    async def reboot(self) -> None:
+        """Reboot is not available on SD_PRO firmware."""
+        raise NotImplementedError("SD_PRO firmware does not expose a reboot endpoint")
 
     async def set_theme(self, theme: int) -> None:
         """Set SD_PRO active theme."""

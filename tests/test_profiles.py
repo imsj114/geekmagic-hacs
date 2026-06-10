@@ -77,6 +77,7 @@ async def test_ultra_profile_uploads_and_selects_direct_image() -> None:
     assert profile.capabilities.profile_id == MODEL_ULTRA
     assert profile.capabilities.custom_image_theme == 3
     assert profile.capabilities.display_mechanism == "direct_image"
+    assert profile.capabilities.supports_reboot is True
 
     state = await profile.get_state()
     assert state.theme == 3
@@ -116,6 +117,7 @@ async def test_pro_profile_uses_picture_theme_without_buttons_by_default() -> No
     assert profile.capabilities.custom_image_theme == 4
     assert profile.capabilities.display_mechanism == "picture_album"
     assert profile.capabilities.requires_managed_album is True
+    assert profile.capabilities.supports_reboot is True
     assert await profile.get_brightness() == 85
 
     album = await profile.get_album_settings()
@@ -196,6 +198,7 @@ async def test_sdpro_profile_uses_photo_slideshow_operations() -> None:
     assert profile.capabilities.profile_id == MODEL_SD_PRO
     assert profile.capabilities.custom_image_theme == 2
     assert profile.capabilities.display_mechanism == "photo_slideshow"
+    assert profile.capabilities.supports_reboot is False
 
     state = await profile.get_state()
     assert state.theme == 1
@@ -216,6 +219,30 @@ async def test_sdpro_profile_uses_photo_slideshow_operations() -> None:
         "/photo/interval?val=1",
         "/api/set?key=theme&value=2",
     ]
+
+
+@pytest.mark.asyncio
+async def test_stock_profiles_reboot_via_set_endpoint() -> None:
+    """Stock firmware profiles reboot through /set?reboot=1."""
+    for profile_cls in (StockUltraProfile, StockProProfile):
+        transport = FakeTransport()
+        profile = profile_cls(transport)
+
+        await profile.reboot()
+
+        assert transport.checked == [("/set?reboot=1", "reboot")]
+
+
+@pytest.mark.asyncio
+async def test_sdpro_profile_does_not_support_reboot() -> None:
+    """SD_PRO firmware exposes no reboot endpoint, so reboot must raise."""
+    transport = FakeTransport()
+    profile = SdProProfile(transport)
+
+    with pytest.raises(NotImplementedError):
+        await profile.reboot()
+
+    assert transport.checked == []
 
 
 @pytest.mark.asyncio

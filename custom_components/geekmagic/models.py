@@ -127,6 +127,7 @@ class FirmwareCapabilities:
     brightness_range: tuple[int, int] = (0, 100)
     user_warnings: tuple[str, ...] = ()
     requires_managed_album: bool = False
+    supports_reboot: bool = True
 
 
 @dataclass(frozen=True)
