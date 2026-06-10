@@ -1040,6 +1040,91 @@ class TestGaugeWidget:
         component = widget.render(ctx, state)
         assert getattr(component, "value", None) == "75"  # no trailing "%"
 
+    def test_precision_in_schema(self):
+        """Precision option is exposed in the schema for the panel editor (issue #94)."""
+        option = next(
+            (o for o in GaugeWidget.SCHEMA["options"] if o["key"] == "precision"),
+            None,
+        )
+        assert option is not None
+        assert option["type"] == "number"
+        assert option["min"] == 0
+        assert option["max"] == 5
+
+    def test_render_with_precision(self, renderer, canvas, rect, hass):
+        """Precision=1 renders one decimal place (issue #94)."""
+        _img, draw = canvas
+        ctx = RenderContext(draw, rect, renderer)
+        hass.states.async_set("sensor.temp", "23.456", {"friendly_name": "Temp"})
+
+        config = WidgetConfig(
+            widget_type="gauge",
+            slot=0,
+            entity_id="sensor.temp",
+            options={"precision": 1, "show_unit": False},
+        )
+        widget = GaugeWidget(config)
+        state = _build_widget_state(hass, "sensor.temp")
+        component = widget.render(ctx, state)
+        from custom_components.geekmagic.widgets.component_helpers import BarGauge
+
+        assert isinstance(component, BarGauge)
+        assert component.value == "23.5"
+
+    def test_render_without_precision_keeps_whole_number(self, renderer, canvas, rect, hass):
+        """Regression: precision omitted keeps the legacy whole-number format."""
+        _img, draw = canvas
+        ctx = RenderContext(draw, rect, renderer)
+        hass.states.async_set("sensor.temp", "23.456", {"friendly_name": "Temp"})
+
+        config = WidgetConfig(
+            widget_type="gauge",
+            slot=0,
+            entity_id="sensor.temp",
+            options={"show_unit": False},
+        )
+        widget = GaugeWidget(config)
+        state = _build_widget_state(hass, "sensor.temp")
+        component = widget.render(ctx, state)
+        from custom_components.geekmagic.widgets.component_helpers import BarGauge
+
+        assert isinstance(component, BarGauge)
+        assert component.value == "23"
+
+    def test_render_with_float_precision(self, renderer, canvas, rect, hass):
+        """Precision arriving as a float (panel parseFloat round-trip) is coerced."""
+        _img, draw = canvas
+        ctx = RenderContext(draw, rect, renderer)
+        hass.states.async_set("sensor.temp", "23.456", {"friendly_name": "Temp"})
+
+        config = WidgetConfig(
+            widget_type="gauge",
+            slot=0,
+            entity_id="sensor.temp",
+            options={"precision": 2.0, "show_unit": False},
+        )
+        widget = GaugeWidget(config)
+        state = _build_widget_state(hass, "sensor.temp")
+        component = widget.render(ctx, state)
+        from custom_components.geekmagic.widgets.component_helpers import BarGauge
+
+        assert isinstance(component, BarGauge)
+        assert component.value == "23.46"
+
+    def test_render_precision_without_entity_shows_placeholder(self, renderer, canvas, rect):
+        """Missing entity still renders the ``--`` placeholder with precision set."""
+        _img, draw = canvas
+        ctx = RenderContext(draw, rect, renderer)
+
+        config = WidgetConfig(widget_type="gauge", slot=0, options={"precision": 1})
+        widget = GaugeWidget(config)
+        state = _build_widget_state()
+        component = widget.render(ctx, state)
+        from custom_components.geekmagic.widgets.component_helpers import BarGauge
+
+        assert isinstance(component, BarGauge)
+        assert "--" in component.value
+
     def test_cleared_icon_normalises_to_none(self):
         """ha-icon-picker writes ``""`` when cleared — the gauge widget
         normalises that to ``None`` so DataCard doesn't render

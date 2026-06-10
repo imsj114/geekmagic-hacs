@@ -48,6 +48,13 @@ class GaugeWidget(Widget):
             {"key": "show_unit", "type": "boolean", "label": "Show Unit", "default": True},
             {"key": "icon", "type": "icon", "label": "Icon"},
             {"key": "attribute", "type": "text", "label": "Entity Attribute"},
+            {
+                "key": "precision",
+                "type": "number",
+                "label": "Decimal Places",
+                "min": 0,
+                "max": 5,
+            },
             {"key": "color_thresholds", "type": "thresholds", "label": "Color Thresholds"},
         ],
     }
@@ -69,6 +76,8 @@ class GaugeWidget(Widget):
         self.unit = config.options.get("unit", "")
         # Attribute to read value from
         self.attribute = config.options.get("attribute")
+        # Decimal places for the displayed value (None = legacy whole-number)
+        self.precision = config.options.get("precision")
         # Color thresholds
         self.color_thresholds = config.options.get("color_thresholds", [])
 
@@ -109,7 +118,13 @@ class GaugeWidget(Widget):
 
         # Extract numeric value
         value = entity.numeric(self.attribute) if entity is not None else 0.0
-        display_value = f"{value:.0f}" if entity is not None else "--"
+        # The panel's number field stores parseFloat output, so precision can
+        # arrive as a float over JSON — coerce to a non-negative int.
+        try:
+            precision = max(0, int(self.precision)) if self.precision is not None else 0
+        except (TypeError, ValueError):
+            precision = 0
+        display_value = f"{value:.{precision}f}" if entity is not None else "--"
 
         # Get unit (override > entity unit, suppressed when show_unit is off).
         if not self.show_unit:
