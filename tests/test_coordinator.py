@@ -1218,3 +1218,118 @@ class TestCoordinatorPause:
             await coordinator.async_set_active(False)
 
         mock_notify.assert_called_once()
+
+
+class TestPreviewUpdates:
+    """Tests for the preview image update behavior (issue #81).
+
+    The preview must refresh on every successful render cycle, not only
+    after config changes — otherwise the Display Preview image entity
+    shows a stale frame between configuration edits.
+    """
+
+    @pytest.fixture
+    def preview_device(self):
+        """Create mock device for preview tests."""
+        device = MagicMock()
+        device.host = "192.168.1.100"
+        device.model = "unknown"
+        device.display_rendered_dashboard = AsyncMock()
+        device.set_brightness = AsyncMock()
+        device.get_brightness = AsyncMock(return_value=50)
+        device.get_state = AsyncMock(return_value=None)
+        device.get_space = AsyncMock(return_value=None)
+        device.is_builtin_theme = MagicMock(return_value=False)
+        device.set_theme_custom = AsyncMock()
+        return device
+
+    @pytest.fixture
+    def simple_options(self):
+        """Create simple single-screen options."""
+        return {
+            CONF_REFRESH_INTERVAL: 10,
+            CONF_SCREENS: [
+                {
+                    "name": "Test",
+                    CONF_LAYOUT: LAYOUT_GRID_2X2,
+                    CONF_WIDGETS: [{"type": "clock", "slot": 0}],
+                }
+            ],
+        }
+
+    @pytest.mark.asyncio
+    async def test_preview_updates_on_every_render_cycle(
+        self, hass, preview_device, simple_options
+    ):
+        """Periodic refreshes (no config change) update the preview each time."""
+        coordinator = GeekMagicCoordinator(hass, preview_device, simple_options)
+
+        with patch.object(coordinator, "_render_display", return_value=(b"jpeg1", b"png1")):
+            await coordinator._async_update_data()
+        assert coordinator.preview_just_updated is True
+        assert coordinator.last_image == b"png1"
+
+        # Second cycle with NO config change — preview must still refresh
+        with patch.object(coordinator, "_render_display", return_value=(b"jpeg2", b"png2")):
+            await coordinator._async_update_data()
+        assert coordinator.preview_just_updated is True
+        assert coordinator.last_image == b"png2"
+
+    @pytest.mark.asyncio
+    async def test_builtin_mode_does_not_signal_preview_update(
+        self, hass, preview_device, simple_options
+    ):
+        """Cycles that render nothing (builtin mode) reset the preview flag."""
+        coordinator = GeekMagicCoordinator(hass, preview_device, simple_options)
+
+        with patch.object(coordinator, "_render_display", return_value=(b"jpeg1", b"png1")):
+            await coordinator._async_update_data()
+        assert coordinator.preview_just_updated is True
+
+        coordinator.set_display_mode("builtin", 1)
+        result = await coordinator._async_update_data()
+
+        assert result["builtin_mode"] is True
+        assert coordinator.preview_just_updated is False
+        # Last rendered image is kept for the entity's image content
+        assert coordinator.last_image == b"png1"
+
+    @pytest.mark.asyncio
+    async def test_paused_cycle_does_not_signal_preview_update(
+        self, hass, preview_device, simple_options
+    ):
+        """Paused cycles reset the preview flag."""
+        coordinator = GeekMagicCoordinator(hass, preview_device, simple_options)
+
+        with patch.object(coordinator, "_render_display", return_value=(b"jpeg1", b"png1")):
+            await coordinator._async_update_data()
+        assert coordinator.preview_just_updated is True
+
+        coordinator._paused = True
+        result = await coordinator._async_update_data()
+
+        assert result == {"success": True, "paused": True}
+        assert coordinator.preview_just_updated is False
+
+    @pytest.mark.asyncio
+    async def test_failed_upload_still_updates_preview_to_latest_render(
+        self, hass, preview_device, simple_options
+    ):
+        """The preview reflects the latest render even if the upload fails.
+
+        Rendering succeeded before the upload was attempted, so the preview
+        entity legitimately shows the freshly rendered frame.
+        """
+        from homeassistant.helpers.update_coordinator import UpdateFailed
+
+        coordinator = GeekMagicCoordinator(hass, preview_device, simple_options)
+
+        preview_device.display_rendered_dashboard = AsyncMock(side_effect=Exception("boom"))
+        with (
+            patch.object(coordinator, "_render_display", return_value=(b"jpeg2", b"png2")),
+            pytest.raises(UpdateFailed),
+        ):
+            await coordinator._async_update_data()
+
+        assert coordinator.preview_just_updated is True
+        assert coordinator.last_image == b"png2"

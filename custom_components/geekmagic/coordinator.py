@@ -342,7 +342,6 @@ class GeekMagicCoordinator(DataUpdateCoordinator):
         self._chart_history: dict[str, list[float]] = {}  # Pre-fetched chart history
         self._candlestick_data: dict[str, list[tuple[float, float, float, float]]] = {}
         self._weather_forecasts: dict[str, list[dict[str, Any]]] = {}  # Pre-fetched forecasts
-        self._update_preview: bool = True  # Update preview on next refresh
         self._preview_just_updated: bool = False  # True if preview was updated in last refresh
 
         # Device state (updated on refresh)
@@ -701,8 +700,7 @@ class GeekMagicCoordinator(DataUpdateCoordinator):
         # Rebuild all screens
         self._setup_screens()
 
-        # Update preview on next refresh (config changed)
-        self._update_preview = True
+        # Preview updates on next refresh automatically
 
     def _build_widget_states(self, layout: Layout) -> dict[int, WidgetState]:
         """Build WidgetState for all widgets in a layout.
@@ -988,6 +986,10 @@ class GeekMagicCoordinator(DataUpdateCoordinator):
             Dictionary with update status
         """
         try:
+            # Reset preview flag so cycles that render nothing (paused,
+            # builtin mode, failures) don't re-signal a stale preview update.
+            self._preview_just_updated = False
+
             if self._paused:
                 return {"success": True, "paused": True}
 
@@ -1105,12 +1107,9 @@ class GeekMagicCoordinator(DataUpdateCoordinator):
             # (Pillow image operations are CPU-intensive)
             jpeg_data, png_data = await self.hass.async_add_executor_job(self._render_display)
 
-            # Only update preview image on config changes or manual refresh
-            # (prevents HA UI from refreshing during periodic updates)
-            self._preview_just_updated = self._update_preview
-            if self._update_preview:
-                self._last_image = png_data
-                self._update_preview = False
+            # Update preview image on every successful render cycle (#81)
+            self._preview_just_updated = True
+            self._last_image = png_data
 
             _LOGGER.debug(
                 "Rendered image: JPEG=%d bytes, PNG=%d bytes",
@@ -1415,7 +1414,6 @@ class GeekMagicCoordinator(DataUpdateCoordinator):
         # Ensure device is in custom image mode
         await self.device.set_theme_custom()
 
-        self._update_preview = True  # Update preview on manual refresh
         await self.async_request_refresh()
 
     async def async_reload_views(self) -> None:
@@ -1427,7 +1425,6 @@ class GeekMagicCoordinator(DataUpdateCoordinator):
         if self.options.get(CONF_ASSIGNED_VIEWS):
             self._display_mode = "custom"
             self._custom_display_requested = True
-        self._update_preview = True
         await self.async_request_refresh()
 
     async def _async_fetch_camera_images(self) -> None:
