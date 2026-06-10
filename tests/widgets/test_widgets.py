@@ -1038,7 +1038,7 @@ class TestGaugeWidget:
         widget = GaugeWidget(config)
         state = _build_widget_state(hass, "sensor.cpu")
         component = widget.render(ctx, state)
-        assert component.value == "75"  # no trailing "%"
+        assert getattr(component, "value", None) == "75"  # no trailing "%"
 
     def test_cleared_icon_normalises_to_none(self):
         """ha-icon-picker writes ``""`` when cleared — the gauge widget
@@ -1587,7 +1587,7 @@ class TestWeatherWidget:
         texts = [c.text for c in display._high_low_chips(icon_size=12) if hasattr(c, "text")]
         assert "26°" in texts
         assert "14°" in texts
-        assert not any("." in t for t in texts)
+        assert not any("." in str(t) for t in texts)
 
     def test_forecast_list_row_rounds_to_integer(self):
         """Vertical-layout forecast temps round and show no decimals."""
