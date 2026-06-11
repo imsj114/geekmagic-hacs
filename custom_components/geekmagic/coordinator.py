@@ -1439,6 +1439,10 @@ class GeekMagicCoordinator(DataUpdateCoordinator):
             self._device_brightness = 0
             self._paused = True
             _LOGGER.debug("Display paused (pre-pause brightness: %s)", self._pre_pause_brightness)
+            # Out-of-cycle notification: the preview image hasn't changed, so
+            # clear the flag left over from the last render before listeners
+            # (the preview image entity) read it.
+            self._preview_just_updated = False
             self.async_update_listeners()
 
     async def async_refresh_display(self) -> None:

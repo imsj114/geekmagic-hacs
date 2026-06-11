@@ -1276,6 +1276,20 @@ class TestPreviewUpdates:
         assert coordinator.last_image == b"png2"
 
     @pytest.mark.asyncio
+    async def test_pause_does_not_signal_preview_update(self, hass, preview_device, simple_options):
+        """Pausing notifies listeners out-of-cycle; the leftover flag from the
+        last render must not make the preview entity re-signal an unchanged
+        image."""
+        coordinator = GeekMagicCoordinator(hass, preview_device, simple_options)
+
+        with patch.object(coordinator, "_render_display", return_value=(b"jpeg", b"png")):
+            await coordinator._async_update_data()
+        assert coordinator.preview_just_updated is True
+
+        await coordinator.async_set_active(False)
+        assert coordinator.preview_just_updated is False
+
+    @pytest.mark.asyncio
     async def test_builtin_mode_does_not_signal_preview_update(
         self, hass, preview_device, simple_options
     ):
