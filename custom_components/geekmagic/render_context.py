@@ -234,17 +234,19 @@ class RenderContext:
             Font scaled appropriately for the container size
 
         Note:
-            The context's ``font_adjust`` (per-widget "Text Size" option) is
-            added to ``adjust``, clamped to [-4, +4]. With font_adjust=0 the
-            combined value equals ``adjust`` exactly, so default rendering is
-            byte-identical. fit_text()-sized text is unaffected by design.
+            The context's ``font_adjust`` (per-widget "Text Size" option,
+            clamped to [-2, +2]) is applied AFTER the renderer's minimum-size
+            floor, so it stays effective for floored captions/labels in small
+            cells. With font_adjust=0 the result equals plain ``adjust``
+            exactly, so default rendering is byte-identical. fit_text()-sized
+            text is unaffected by design.
         """
-        combined_adjust = max(-4, min(4, adjust + self._font_adjust))
         return self._renderer.get_scaled_font(
             size_name,
             self._scaled_height,
             bold=bold,
-            adjust=combined_adjust,
+            adjust=max(-4, min(4, adjust)),
+            post_adjust=max(-2, min(2, self._font_adjust)),
             rounded=self.theme.rounded_font,
             semibold=semibold,
         )

@@ -168,24 +168,40 @@ class TestFontMethods:
                     size_name, adjust=per_call_adjust
                 )
 
-    def test_font_adjust_combined_clamp(self):
-        """The combined per-call + per-widget adjustment is clamped to
-        [-4, +4]."""
+    def test_font_adjust_clamped(self):
+        """The per-widget font_adjust is clamped to [-2, +2]."""
         renderer = Renderer()
         _img, draw = renderer.create_canvas()
         rect = (0, 0, 200, 200)
 
-        ctx_max = RenderContext(draw, rect, renderer, font_adjust=4)
+        ctx_max = RenderContext(draw, rect, renderer, font_adjust=2)
         ctx_over = RenderContext(draw, rect, renderer, font_adjust=10)
         # font_adjust beyond the clamp behaves like the clamp boundary
         assert ctx_over.get_font("secondary") is ctx_max.get_font("secondary")
-        # per-call adjust on top of font_adjust cannot exceed the clamp either
-        ctx_two = RenderContext(draw, rect, renderer, font_adjust=2)
-        assert ctx_two.get_font("secondary", adjust=4) is ctx_max.get_font("secondary")
 
-        ctx_min = RenderContext(draw, rect, renderer, font_adjust=-4)
+        ctx_min = RenderContext(draw, rect, renderer, font_adjust=-2)
         ctx_under = RenderContext(draw, rect, renderer, font_adjust=-10)
         assert ctx_under.get_font("secondary") is ctx_min.get_font("secondary")
+
+    def test_font_adjust_effective_for_floored_small_text(self):
+        """font_adjust still changes floored captions/labels (issue #31).
+
+        In a short cell, tertiary text hits the renderer's minimum-size
+        floor; a pre-floor adjustment would be swallowed by it. The
+        per-widget Text Size applies after the floor so the user's choice
+        remains visible exactly where small text is hardest to read.
+        """
+        renderer = Renderer()
+        _img, draw = renderer.create_canvas()
+        rect = (0, 0, 100, 60)  # tertiary lands below the floor here
+
+        sizes = []
+        for adjust in (-2, 0, 2):
+            ctx = RenderContext(draw, rect, renderer, font_adjust=adjust)
+            font = ctx.get_font("tertiary")
+            sizes.append(ctx.get_text_size("Label", font)[0])
+
+        assert sizes[0] < sizes[1] < sizes[2]
 
     def test_get_text_size_with_default_font(self):
         """Test get_text_size with default font."""
