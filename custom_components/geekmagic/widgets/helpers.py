@@ -283,15 +283,28 @@ _LABEL_ABBREVIATIONS = {
 }
 
 
+def _match_case(abbrev: str, source: str) -> str:
+    """Render an abbreviation in the same case style as its source word."""
+    if source.isupper():
+        return abbrev
+    if source[:1].isupper():
+        return abbrev.capitalize()
+    return abbrev.lower()
+
+
 def abbreviate_label(text: str) -> str | None:
     """Return a word-wise abbreviated form of a caption, or None.
 
-    Case-insensitive lookup, preserving the other words as given.
-    Returns None when no word has a shorter form (callers can then
-    skip the fallback entirely).
+    Case-insensitive lookup; each abbreviation adopts the case style of
+    the word it replaces ("Temperature" → "Temp", "TEMPERATURE" → "TEMP").
+    Returns None when no word has a shorter form (callers can then skip
+    the fallback entirely).
     """
     words = text.split()
-    short = [_LABEL_ABBREVIATIONS.get(w.upper(), w) for w in words]
+    short = [
+        _match_case(_LABEL_ABBREVIATIONS[w.upper()], w) if w.upper() in _LABEL_ABBREVIATIONS else w
+        for w in words
+    ]
     if short == words:
         return None
     return " ".join(short)
