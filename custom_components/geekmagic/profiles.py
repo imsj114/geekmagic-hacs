@@ -486,6 +486,7 @@ class StockProProfile(FirmwareProfile):
                 theme=self._last_theme,
                 brightness=None,
                 current_image=self._last_image,
+                is_live=False,
             )
 
         raise RuntimeError("Device state was not read")

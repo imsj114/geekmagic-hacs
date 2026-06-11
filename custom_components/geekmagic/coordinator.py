@@ -1133,13 +1133,16 @@ class GeekMagicCoordinator(DataUpdateCoordinator):
             # churn, #158). Dashboards with clocks/seconds change every
             # frame and still upload each cycle — the win is static
             # dashboards. SD_PRO reports current_image=None, so it never
-            # skips (safe default).
+            # skips (safe default). Pro firmware without a readable app.json
+            # synthesizes state from our own last commands (is_live=False) —
+            # that echo can't confirm anything, so it never skips either.
             device_state = self._device_state
             can_skip = (
                 self._last_uploaded_jpeg is not None
                 and jpeg_data == self._last_uploaded_jpeg
                 and device_state_fresh
                 and device_state is not None
+                and device_state.is_live
                 and self.device.is_custom_theme(device_state.theme)
                 and device_state.current_image is not None
                 and device_state.current_image.endswith("dashboard.jpg")

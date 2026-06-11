@@ -28,6 +28,10 @@ class DeviceState:
     theme: int | None
     brightness: int | None
     current_image: str | None
+    # False when the state was synthesized from the integration's own last
+    # commands (e.g. Pro firmware without a readable app.json) rather than
+    # read back from the device.
+    is_live: bool = True
 
 
 @dataclass
