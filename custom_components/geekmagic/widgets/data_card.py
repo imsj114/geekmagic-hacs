@@ -60,6 +60,7 @@ from .components import (
     Text,
     VerticalBar,
 )
+from .helpers import abbreviate_label
 
 if TYPE_CHECKING:
     from ..render_context import RenderContext
@@ -281,13 +282,17 @@ class DataCard(Component):
     def _caption_text(self) -> Text:
         # ``tertiary`` (12% of container height) scales with the cell;
         # ``tiny`` is a fixed bucket that won't grow into roomy cells.
-        # ``auto_fit`` will still shrink it when the band is tight.
+        # ``auto_fit`` will still shrink it when the band is tight, and
+        # the abbreviation fallback ("TEMP") beats an ellipsis
+        # ("TEMPERA…") when even the smallest font can't fit the word.
+        caption = (self.caption or "").upper()
         return Text(
-            (self.caption or "").upper(),
+            caption,
             font="tertiary",
             color=THEME_TEXT_SECONDARY,
             truncate=True,
             auto_fit=True,
+            fallback_text=abbreviate_label(caption),
         )
 
     def _supporting_row(self) -> Component | None:
