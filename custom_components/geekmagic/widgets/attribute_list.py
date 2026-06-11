@@ -147,12 +147,15 @@ class AttributeListDisplay(Component):
         # Use a tight gap so all rows have a chance to fit before the flex
         # shrink kicks in. Column will proportionally shrink each row's
         # height if total content exceeds the container.
+        # space-evenly distributes the rows across tall cells (fullscreen /
+        # hero slots) instead of clustering them at the top; when content
+        # overflows it degrades to the same packed layout as justify="start".
         Column(
             children=rows,
             gap=3 if show_title else 2,
             padding=padding,
             align="stretch",
-            justify="start",
+            justify="space-evenly",
         ).render(ctx, x, y, width, height)
 
 
