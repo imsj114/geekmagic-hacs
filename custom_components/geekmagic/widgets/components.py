@@ -167,6 +167,12 @@ class Text(Component):
             f = ctx.get_font(name, bold=self.bold)
             if ctx.get_text_size(self.text, f)[0] <= max_width:
                 return f
+        # Nothing in the discrete chain fits — scale continuously before
+        # giving up. A clock missing the smallest bucket by one pixel must
+        # shrink, not render "10:30:00 A…".
+        fitted = ctx.fit_text(self.text, max_width=max_width, bold=self.bold)
+        if ctx.get_text_size(self.text, fitted)[0] <= max_width:
+            return fitted
         return ctx.get_font(chain[-1], bold=self.bold)
 
     def measure(self, ctx: RenderContext, max_width: int, max_height: int) -> tuple[int, int]:
