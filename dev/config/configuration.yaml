@@ -1,0 +1,53 @@
+# Local dev Home Assistant config for testing the GeekMagic integration.
+# Throwaway instance — do not point this at production data. See dev/README.md.
+
+default_config:
+
+# Built-in fake entities: lights, sensors, climate, media_player, weather, etc.
+# Gives every widget/layout something realistic to render out of the box.
+demo:
+
+logger:
+  default: info
+  logs:
+    custom_components.geekmagic: debug
+
+# Curated, predictable test entities for specific widget scenarios.
+template:
+  # Static, known values — handy for eyeballing exact formatting.
+  - sensor:
+      - name: "Test Temperature"
+        unique_id: gm_test_temperature
+        unit_of_measurement: "°C"
+        device_class: temperature
+        state_class: measurement
+        state: "21.4"
+      - name: "Test Humidity"
+        unique_id: gm_test_humidity
+        unit_of_measurement: "%"
+        device_class: humidity
+        state_class: measurement
+        state: "58"
+      - name: "Test Battery"
+        unique_id: gm_test_battery
+        unit_of_measurement: "%"
+        device_class: battery
+        state_class: measurement
+        state: "76"
+
+  # Values that change every 5s, so charts/sparklines accumulate history.
+  - trigger:
+      - platform: time_pattern
+        seconds: "/5"
+    sensor:
+      - name: "Test Power"
+        unique_id: gm_test_power
+        unit_of_measurement: "W"
+        device_class: power
+        state_class: measurement
+        state: "{{ range(80, 320) | random }}"
+    binary_sensor:
+      - name: "Test Motion"
+        unique_id: gm_test_motion
+        device_class: motion
+        state: "{{ (now().timestamp() // 5) | int % 4 == 0 }}"

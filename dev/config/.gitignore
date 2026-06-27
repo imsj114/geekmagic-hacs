@@ -1,0 +1,5 @@
+# HA writes a lot of runtime state into this config dir at startup.
+# Keep only the files we author; ignore everything HA generates.
+*
+!.gitignore
+!configuration.yaml

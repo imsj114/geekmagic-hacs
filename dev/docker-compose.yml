@@ -1,0 +1,26 @@
+# Throwaway local Home Assistant for testing the GeekMagic integration.
+#
+#   docker compose -f dev/docker-compose.yml up        # start (foreground)
+#   docker compose -f dev/docker-compose.yml up -d     # start (background)
+#   docker compose -f dev/docker-compose.yml restart   # reload after code changes
+#   docker compose -f dev/docker-compose.yml down       # stop
+#
+# The integration is BIND-MOUNTED from the repo, so switching git branches
+# changes the code HA loads. Restart the container to pick up Python changes.
+# See dev/README.md.
+
+services:
+  homeassistant:
+    image: ghcr.io/home-assistant/home-assistant:stable
+    container_name: geekmagic-dev-ha
+    restart: unless-stopped
+    ports:
+      - "8123:8123"
+    environment:
+      TZ: ${TZ:-Europe/Paris}
+    volumes:
+      # HA config (this dir). HA writes its runtime state here.
+      - ./config:/config
+      # Live mount of the integration straight from the repo. `git checkout`
+      # a branch on the host, then `docker compose restart` to load it.
+      - ../custom_components/geekmagic:/config/custom_components/geekmagic
