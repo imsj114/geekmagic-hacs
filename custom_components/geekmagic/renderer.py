@@ -5,6 +5,7 @@ Uses 2x supersampling for anti-aliased output.
 
 from __future__ import annotations
 
+from contextlib import suppress
 from io import BytesIO
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -44,6 +45,7 @@ _NUNITO_BOLD = _FONTS_DIR / "Nunito-Bold.ttf"
 _NUNITO_EXTRABOLD = _FONTS_DIR / "Nunito-ExtraBold.ttf"
 _DEJAVU_REGULAR = _FONTS_DIR / "DejaVuSans.ttf"
 _DEJAVU_BOLD = _FONTS_DIR / "DejaVuSans-Bold.ttf"
+_NOTO_SANS_KR = _FONTS_DIR / "NotoSansKR-wght.ttf"
 
 # System fallback paths (Linux / macOS / Windows). The macOS entries are
 # (path, ttc-index) tuples.
@@ -57,6 +59,64 @@ _SYS_REGULAR: list[Path | str | tuple[str, int]] = [
     ("/System/Library/Fonts/Helvetica.ttc", 0),
     "C:/Windows/Fonts/arial.ttf",
 ]
+_SYS_CJK: list[Path | str | tuple[str, int]] = [
+    _NOTO_SANS_KR,
+    "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
+    "/usr/share/fonts/opentype/noto/NotoSansCJKkr-Regular.otf",
+    "/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc",
+    ("/System/Library/Fonts/AppleSDGothicNeo.ttc", 0),
+    "/System/Library/Fonts/Supplemental/AppleGothic.ttf",
+    "C:/Windows/Fonts/malgun.ttf",
+]
+
+
+def _contains_cjk(text: str) -> bool:
+    """Return True when text includes Hangul or CJK-family codepoints."""
+    return any(
+        0x1100 <= codepoint <= 0x11FF  # Hangul Jamo
+        or 0x2E80 <= codepoint <= 0x9FFF  # CJK radicals, Kana, CJK ideographs
+        or 0xAC00 <= codepoint <= 0xD7AF  # Hangul syllables and Jamo extended-B
+        or 0xF900 <= codepoint <= 0xFAFF  # CJK compatibility ideographs
+        or 0xFE30 <= codepoint <= 0xFE4F  # CJK compatibility forms
+        or 0xFF00 <= codepoint <= 0xFFEF  # Half/full width forms
+        for codepoint in map(ord, text)
+    )
+
+
+def _font_weight(font: FreeTypeFont | ImageFont.ImageFont) -> int:
+    """Infer a numeric weight from a loaded font."""
+    try:
+        family, style = font.getname()
+    except (AttributeError, OSError):
+        family, style = "", ""
+    name = f"{family} {style} {getattr(font, 'path', '')}".lower()
+    if "semi" in name and "bold" in name:
+        return 600
+    if "extra" in name and "bold" in name:
+        return 800
+    if "bold" in name:
+        return 700
+    return 400
+
+
+def _try_cjk_truetype(
+    paths: list[Path | str | tuple[str, int]], size: int, weight: int
+) -> FreeTypeFont | ImageFont.ImageFont:
+    """Return a CJK-capable font, applying variable font weight when available."""
+    for entry in paths:
+        try:
+            if isinstance(entry, tuple):
+                path, index = entry
+                font = ImageFont.truetype(path, size, index=index)
+            else:
+                font = ImageFont.truetype(str(entry), size)
+        except OSError:
+            continue
+        else:
+            with suppress(AttributeError, OSError, ValueError):
+                font.set_variation_by_axes([weight])
+            return font
+    return ImageFont.load_default()
 
 
 def _try_truetype(
@@ -155,6 +215,7 @@ class Renderer:
 
         # MDI icon font cache (keyed by scaled size)
         self._mdi_font_cache: dict[int, FreeTypeFont | ImageFont.ImageFont] = {}
+        self._cjk_font_cache: dict[tuple[int, int], FreeTypeFont | ImageFont.ImageFont] = {}
 
     @property
     def scale(self) -> int:
@@ -164,6 +225,22 @@ class Renderer:
     def _s(self, value: float) -> int:
         """Scale a value for supersampling."""
         return int(value * self._scale)
+
+    def _font_for_text(
+        self,
+        font: FreeTypeFont | ImageFont.ImageFont,
+        text: str,
+    ) -> FreeTypeFont | ImageFont.ImageFont:
+        """Swap to a CJK-capable font when the selected font lacks that coverage."""
+        if not _contains_cjk(text):
+            return font
+
+        size = getattr(font, "size", self.font_regular.size)
+        weight = _font_weight(font)
+        cache_key = (int(size), weight)
+        if cache_key not in self._cjk_font_cache:
+            self._cjk_font_cache[cache_key] = _try_cjk_truetype(_SYS_CJK, int(size), weight)
+        return self._cjk_font_cache[cache_key]
 
     def get_scaled_font(
         self,
@@ -248,11 +325,12 @@ class Renderer:
         All dimensions should be in scaled coordinates.
         """
         low, high = min_size, max_size
-        best_font = _load_font(min_size, bold=bold, rounded=rounded)
+        uses_cjk = _contains_cjk(text)
+        best_font = self._font_for_text(_load_font(min_size, bold=bold, rounded=rounded), text)
 
         while low <= high:
             mid = (low + high) // 2
-            font = _load_font(mid, bold=bold, rounded=rounded)
+            font = self._font_for_text(_load_font(mid, bold=bold, rounded=rounded), text)
             bbox = font.getbbox(text)
 
             if bbox:
@@ -267,12 +345,13 @@ class Renderer:
             else:
                 high = mid - 1
 
-        bbox = best_font.getbbox(text)
-        if bbox:
-            size = int(bbox[3] - bbox[1])
-            cache_key = (size, bold, rounded)
-            if cache_key not in self._font_cache:
-                self._font_cache[cache_key] = best_font
+        if not uses_cjk:
+            bbox = best_font.getbbox(text)
+            if bbox:
+                size = int(bbox[3] - bbox[1])
+                cache_key = (size, bold, rounded)
+                if cache_key not in self._font_cache:
+                    self._font_cache[cache_key] = best_font
 
         return best_font
 
@@ -416,6 +495,7 @@ class Renderer:
         """
         if font is None:
             font = self.font_regular
+        font = self._font_for_text(font, text)
         scaled_pos = self._scale_point(position)
         draw.text(scaled_pos, text, font=font, fill=color, anchor=anchor)
 
@@ -960,6 +1040,7 @@ class Renderer:
         """
         if font is None:
             font = self.font_regular
+        font = self._font_for_text(font, text)
 
         bbox = font.getbbox(text)
         if bbox:

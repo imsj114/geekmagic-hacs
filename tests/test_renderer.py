@@ -80,6 +80,40 @@ class TestRenderer:
         final = renderer.finalize(img)
         assert final.size == (DISPLAY_WIDTH, DISPLAY_HEIGHT)
 
+    def test_latin_text_keeps_primary_font(self):
+        """Test Latin text continues to use the selected UI font."""
+        renderer = Renderer()
+
+        font = renderer._font_for_text(renderer.font_regular, "Power 20W")
+
+        assert font is renderer.font_regular
+
+    def test_korean_text_uses_cjk_fallback_font(self):
+        """Test Korean text uses a bundled CJK-capable font instead of tofu boxes."""
+        renderer = Renderer()
+
+        font = renderer._font_for_text(renderer.font_regular, "한글 테스트")
+
+        assert font is not renderer.font_regular
+        assert font.getname()[0] == "Noto Sans KR"
+
+    def test_korean_text_size_uses_cjk_metrics(self):
+        """Test Korean text measurements use the same CJK fallback as drawing."""
+        renderer = Renderer()
+        fallback_font = renderer._font_for_text(renderer.font_regular, "서울")
+
+        assert renderer.get_text_size("서울", renderer.font_regular) == renderer.get_text_size(
+            "서울", fallback_font
+        )
+
+    def test_fit_text_uses_cjk_fallback_font(self):
+        """Test auto-fit returns a CJK-capable font for Korean text."""
+        renderer = Renderer()
+
+        font = renderer.fit_text_font("전력 사용량", max_width=200, max_height=80)
+
+        assert font.getname()[0] == "Noto Sans KR"
+
     def test_draw_rect(self):
         """Test drawing rectangles."""
         renderer = Renderer()
